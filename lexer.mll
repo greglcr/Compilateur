@@ -61,14 +61,20 @@ let lident = lower other*
 let uident = upper (other | '.')*
 
 rule next_token = parse
-    | '\n' '\r' '\t' ' '
+    | ['\n' '\r' '\t' ' ']
         { next_token lexbuf }
 
-    | lower* | mathexpr | sep as id
+    | lower+ | mathexpr | sep as id
         { find_valeur id }
 
     | digit+ as n
         { CST (Cint (int_of_string n) ) }
+    
+    | lident as l
+        { LINDENT (l) }
+    
+    | uident as u
+        { UIDENT (u) }
     
     | "--"
         { comment_line lexbuf}
@@ -95,18 +101,79 @@ and comment_line = parse
 and comment = parse
     | "-}"
         { next_token lexbuf }
+    
+    | eof
+        { raise (Lexing_error ("Commentaire non terminé")) }
 
     | _
         { comment lexbuf }
 
 {
 
+let _menhir_print_token : token -> string =
+  fun _tok ->
+    match _tok with
+    | BINOP _ ->
+        "BINOP"
+    | CASE ->
+        "CASE"
+    | CLASS ->
+        "CLASS"
+    | CST _ ->
+        "CST"
+    | DATA ->
+        "DATA"
+    | DO ->
+        "DO"
+    | ELSE ->
+        "ELSE"
+    | EOF ->
+        "EOF"
+    | FALSE ->
+        "FALSE"
+    | FORALL ->
+        "FORALL"
+    | IDENT _ ->
+        "IDENT"
+    | IF ->
+        "IF"
+    | IMPORT ->
+        "IMPORT"
+    | IN ->
+        "IN"
+    | INSTANCE ->
+        "INSTANCE"
+    | LEFTBRACE ->
+        "LEFTBRACE"
+    | LEFTPAR ->
+        "LEFTPAR"
+    | LET ->
+        "LET"
+    | LINDENT _ ->
+        "LINDENT"
+    | MODULE ->
+        "MODULE"
+    | OF ->
+        "OF"
+    | RIGHTBRACE ->
+        "RIGHTBRACE"
+    | RIGHTPAR ->
+        "RIGHTPAR"
+    | THEN ->
+        "THEN"
+    | TRUE ->
+        "TRUE"
+    | UIDENT _ ->
+        "UIDENT"
+    | WHERE ->
+        "WHERE";;
+
     let print_lexeme fileName =
         let c = open_in fileName in
         let lb = from_channel c in
         let rec liste_lexemes curTok = match curTok with
             | EOF -> print_string " EOF\n"
-            | _ -> print_string (Lexing.lexeme lb); print_string " "; (liste_lexemes (next_token lb)) in
+            | _ -> print_string (_menhir_print_token curTok); print_string " "; (liste_lexemes (next_token lb)) in
         (liste_lexemes (next_token lb));;
 
 }
