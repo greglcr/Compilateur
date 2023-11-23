@@ -1,0 +1,8 @@
+(ocamllex
+ (modules lexer))
+(menhir
+ (modules parser))
+(executable
+ (name mini-pure-script)
+ (promote (until-clean))
+ (flags ()))
