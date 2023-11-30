@@ -5,10 +5,9 @@
 
     exception Lexing_error of string
 
-
-    let find_valeur = 
-        let linkMap = Hashtbl.create 17 in
-        List.iter (fun (s, l) -> Hashtbl.add linkMap s l)
+    let resolve_keyword =
+        let keywords = Hashtbl.create 17 in
+        List.iter (fun (s, l) -> Hashtbl.add keywords s l)
                   (
                     [
                         ("case", CASE);
@@ -30,7 +29,7 @@
                         ("where", WHERE)
                     ]
                   );
-        fun s -> try Hashtbl.find linkMap s with Not_found -> LIDENT s
+        fun s -> try Hashtbl.find keywords s with Not_found -> LIDENT s
 }
 
 let digit = ['0'-'9']
@@ -54,11 +53,17 @@ rule next_token = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
+    | "--"
+        { line_comment lexbuf}
+
+    | "{-"
+        { block_comment lexbuf }
+
     | digit+ as n
         { CST (Cint (int_of_string n) ) }
     
     | lident as l
-        { find_valeur l }
+        { resolve_keyword l }
     
     | uident as u
         { UIDENT (u) }
@@ -101,6 +106,12 @@ rule next_token = parse
 
     | "="
         { EQUAL }
+
+    | "->"
+        { ARROW }
+
+    | "=>"
+        { FAT_ARROW }
         
     | "("
         { LEFTPAR }
@@ -117,40 +128,31 @@ rule next_token = parse
     | ";"
         { SEMICOLON }
     
-    | "--"
-        { comment_line lexbuf}
-
-    | "{-"
-        { comment lexbuf }
-    
     | eof
         { EOF }
 
     | _
         { raise (Lexing_error ("erreur") ) }
 
-and comment_line = parse
+and line_comment = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
-    | eof
-        { raise (Lexing_error ("Commentaire non terminé")) }
-
     | _
-        { comment_line lexbuf }
+        { line_comment lexbuf }
 
-and comment = parse
+and block_comment = parse
     | eol
-        { new_line lexbuf; comment lexbuf }
+        { new_line lexbuf; block_comment lexbuf }
 
     | "-}"
         { next_token lexbuf }
     
     | eof
-        { raise (Lexing_error ("Commentaire non terminé")) }
+        { raise (Lexing_error ("unterminated comment")) }
 
     | _
-        { comment lexbuf }
+        { block_comment lexbuf }
 
 {
 
