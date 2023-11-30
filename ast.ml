@@ -29,7 +29,7 @@ and ntype = NTP of uident * (atype list) (* <uident> <atype>* *)
 and atype = 
   | ATl of lident
   | ATu of uident
-  | ATt of tp (* (<type>) *)
+  | ATt of tp (* (<type>) *)  
 
 and tp = 
   | TPa of atype
@@ -63,8 +63,7 @@ and atom =
   | Aexprtype of expr * tp
 
 and expr = 
-  | Econstant of constant
-  | Eident of lident
+  | Eatom of atom
   | Ebinop of binop * expr * expr (* On rajoute pas l'opérateur unaire -, on le verra comme -v = Ebinop(Bsub, 0, v) *)
   | Efonct of lident * (atom list)
   | Emodule of uident * (atom list) (* Dans les deux cas la liste ne peux pas être vide *)

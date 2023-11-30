@@ -42,25 +42,34 @@
                         (">", BINOP (Bgt) );
                         (">=", BINOP (Bge) );
 
+                        ("=", EQUAL);
+
                         ("(", LEFTPAR);
                         (")", RIGHTPAR);
                         ("{", LEFTBRACE);
-                        ("}", RIGHTBRACE)
+                        ("}", RIGHTBRACE);
+                        (";", SEMICOLON)
                     ]
                   );
-        fun s -> try Hashtbl.find linkMap s with Not_found -> IDENT s
+        fun s -> try Hashtbl.find linkMap s with Not_found -> LIDENT s
 }
 
 let digit = ['0'-'9']
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
-let mathexpr = "+" | "-" | "*" | "/" | "<>" | "&&" | "||" | "==" | "<" | "<=" | ">" | ">="
-let sep = "(" | ")" | "{" | "}"
+let mathexpr = "+" | "-" | "*" | "/" | "<>" | "&&" | "||" | "==" | "<" | "<=" | ">" | ">=" | "="
+let sep = "(" | ")" | "{" | "}" | ";" | "."
 let other = lower | upper | digit | "'"
 let lident = lower other*  
 let uident = upper (other | '.')*
 
 rule next_token = parse
+    | "module Main where"
+        { FILEINIT }
+
+    | "import Prelude\nimport Effect\nimport Effect.Console"
+        { IMPORTINIT }
+
     | ['\n' '\r' '\t' ' ']
         { next_token lexbuf }
 
@@ -71,7 +80,7 @@ rule next_token = parse
         { CST (Cint (int_of_string n) ) }
     
     | lident as l
-        { LINDENT (l) }
+        { LIDENT (l) }
     
     | uident as u
         { UIDENT (u) }
@@ -129,8 +138,12 @@ let _menhir_print_token : token -> string =
         "ELSE"
     | EOF ->
         "EOF"
+    | EQUAL ->
+        "EQUAL"
     | FALSE ->
         "FALSE"
+    | FILEINIT ->
+        "FILEINIT"
     | FORALL ->
         "FORALL"
     | IDENT _ ->
@@ -139,6 +152,8 @@ let _menhir_print_token : token -> string =
         "IF"
     | IMPORT ->
         "IMPORT"
+    | IMPORTINIT ->
+        "IMPORTINIT"
     | IN ->
         "IN"
     | INSTANCE ->
@@ -149,8 +164,8 @@ let _menhir_print_token : token -> string =
         "LEFTPAR"
     | LET ->
         "LET"
-    | LINDENT _ ->
-        "LINDENT"
+    | LIDENT _ ->
+        "LIDENT"
     | MODULE ->
         "MODULE"
     | OF ->
@@ -159,6 +174,8 @@ let _menhir_print_token : token -> string =
         "RIGHTBRACE"
     | RIGHTPAR ->
         "RIGHTPAR"
+    | SEMICOLON ->
+        "SEMICOLON"
     | THEN ->
         "THEN"
     | TRUE ->
@@ -166,13 +183,13 @@ let _menhir_print_token : token -> string =
     | UIDENT _ ->
         "UIDENT"
     | WHERE ->
-        "WHERE";;
+        "WHERE"
 
     let print_lexeme fileName =
         let c = open_in fileName in
         let lb = from_channel c in
         let rec liste_lexemes curTok = match curTok with
-            | EOF -> print_string " EOF\n"
+            | EOF -> print_string "EOF\n"
             | _ -> print_string (_menhir_print_token curTok); print_string " "; (liste_lexemes (next_token lb)) in
         (liste_lexemes (next_token lb));;
 
