@@ -101,13 +101,13 @@ expr:
     | LET LEFTBRACE lbi = nonempty_list(binding) SEMICOLON RIGHTBRACE IN e = expr
         { Eaffect (lbi, e) }
     
-    | CASE e = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
-        { Ecase (e, lbranch) }
+    (* | CASE e = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
+        { Ecase (e, lbranch) } *)
 ;
 
 binding:
     | l = lident EQUAL e = expr
-        { }
+        { Baffect (l, e) }
 
 constant:
     | c = CST
