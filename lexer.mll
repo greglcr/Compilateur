@@ -62,7 +62,8 @@ rule next_token = parse
         { block_comment lexbuf }
 
     | digit+ as n
-        { CST (Cint (int_of_string n) ) }
+        { try (CST (Cint (int_of_string s)))
+          with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
     
     | lident as l
         { resolve_keyword l }
@@ -137,7 +138,7 @@ rule next_token = parse
         { EOF }
 
     | _
-        { raise (Lexing_error ("erreur") ) }
+        { raise (Lexing_error ("illegal character: " ^ String.make 1 c) ) }
 
 and line_comment = parse
     | eol
