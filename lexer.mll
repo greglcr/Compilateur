@@ -137,7 +137,7 @@ and line_comment = parse
 
 and block_comment = parse
     | eol
-        { new_line lexbuf; block_ lexbuf }
+        { new_line lexbuf; block_comment lexbuf }
 
     | "-}"
         { next_token lexbuf }
@@ -146,7 +146,7 @@ and block_comment = parse
         { raise (Lexing_error ("unterminated comment")) }
 
     | _
-        { block_ lexbuf }
+        { block_comment lexbuf }
 
 {
 
