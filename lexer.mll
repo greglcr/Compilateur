@@ -53,6 +53,12 @@ rule next_token = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
+    | "--"
+        { line_comment lexbuf}
+
+    | "{-"
+        { block_comment lexbuf }
+
     | digit+ as n
         { CST (Cint (int_of_string n) ) }
     
@@ -116,40 +122,31 @@ rule next_token = parse
     | ";"
         { SEMICOLON }
     
-    | "--"
-        { comment_line lexbuf}
-
-    | "{-"
-        { comment lexbuf }
-    
     | eof
         { EOF }
 
     | _
         { raise (Lexing_error ("erreur") ) }
 
-and comment_line = parse
+and line_comment = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
-    | eof
-        { raise (Lexing_error ("Commentaire non terminé")) }
-
     | _
-        { comment_line lexbuf }
+        { line_comment lexbuf }
 
-and comment = parse
+and block_comment = parse
     | eol
-        { new_line lexbuf; comment lexbuf }
+        { new_line lexbuf; block_ lexbuf }
 
     | "-}"
         { next_token lexbuf }
     
     | eof
-        { raise (Lexing_error ("Commentaire non terminé")) }
+        { raise (Lexing_error ("unterminated comment")) }
 
     | _
-        { comment lexbuf }
+        { block_ lexbuf }
 
 {
 
