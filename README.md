@@ -1,3 +1,7 @@
+# MiniPureScript
+
+## Documentation (préliminaire)
+
 lexer.mll -> contient le lexer qui va retourner les tokens, codé en ocamllex. Dans ce fichier, il faut importer le parser
 car c'est lui qui va contenir la description des lexèmes. Mais à priori il n'y a pas besoin d'importer Ast?
 
