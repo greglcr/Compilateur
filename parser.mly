@@ -21,6 +21,7 @@
 %token SEMICOLON
 %token EOF
 %token <string> IDENT
+%token ARROW FATARROW
 
 %start file (* Seules les fonctions qui sont placées après un start seront copiées dans le fichier .mli,
                 donc seules celles là pourront être appelées en dehors de ce fichier *)
@@ -108,6 +109,10 @@ expr:
 binding:
     | l = lident EQUAL e = expr
         { Baffect (l, e) }
+
+branch:
+    | p = pattern ARROW expr
+        { }
 
 constant:
     | c = CST
