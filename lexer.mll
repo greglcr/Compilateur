@@ -62,6 +62,7 @@ let sep = "(" | ")" | "{" | "}" | ";" | "."
 let other = lower | upper | digit | "'"
 let lident = lower other*  
 let uident = upper (other | '.')*
+let eol = '\n' | '\r' | "\r\n"
 
 rule next_token = parse
     | "module Main where"
@@ -70,8 +71,11 @@ rule next_token = parse
     | "import Prelude\nimport Effect\nimport Effect.Console"
         { IMPORTINIT }
 
-    | ['\n' '\r' '\t' ' ']
+    | ['\t' ' ']
         { next_token lexbuf }
+
+    | eol
+        { new_line lexbuf; next_token lexbuf }
 
     | lower+ | mathexpr | sep as id
         { find_valeur id }
@@ -98,8 +102,8 @@ rule next_token = parse
         { raise (Lexing_error ("erreur") ) }
 
 and comment_line = parse
-    | '\n' 
-        { next_token lexbuf }
+    | eol
+        { new_line lexbuf; next_token lexbuf }
 
     | eof
         { raise (Lexing_error ("Commentaire non terminé")) }
@@ -108,6 +112,9 @@ and comment_line = parse
         { comment_line lexbuf }
 
 and comment = parse
+    | eol
+        { new_line lexbuf; comment lexbuf }
+
     | "-}"
         { next_token lexbuf }
     
