@@ -36,7 +36,6 @@
 let digit = ['0'-'9']
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
-let sep = "(" | ")" | "{" | "}" | ";" | "."
 let other = lower | upper | digit | "'"
 let lident = lower other*
 let uident = upper (other | '.')*
