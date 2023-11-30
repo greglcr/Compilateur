@@ -106,6 +106,12 @@ rule next_token = parse
 
     | "="
         { EQUAL }
+
+    | "->"
+        { ARROW }
+
+    | "=>"
+        { FAT_ARROW }
         
     | "("
         { LEFTPAR }
