@@ -257,8 +257,3 @@ let _menhir_print_token : token -> string =
         (liste_lexemes (next_token lb));;
 
 }
-
-
-
-    
-    
