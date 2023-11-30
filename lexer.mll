@@ -27,28 +27,7 @@
                         ("of", OF);
                         ("then", THEN);
                         ("true", CST (Cbool (true)));
-                        ("where", WHERE);
-
-                        ("+", BINOP (Badd) );
-                        ("-", BINOP (Bsub) );
-                        ("*", BINOP (Bmul) );
-                        ("/", BINOP (Bdiv) );
-                        ("<>", BINOP (Bneq) );
-                        ("&&", BINOP (Band) );
-                        ("||", BINOP (Bor) );
-                        ("==", BINOP (Beq) );
-                        ("<", BINOP (Blt) );
-                        ("<=", BINOP (Ble) );
-                        (">", BINOP (Bgt) );
-                        (">=", BINOP (Bge) );
-
-                        ("=", EQUAL);
-
-                        ("(", LEFTPAR);
-                        (")", RIGHTPAR);
-                        ("{", LEFTBRACE);
-                        ("}", RIGHTBRACE);
-                        (";", SEMICOLON)
+                        ("where", WHERE)
                     ]
                   );
         fun s -> try Hashtbl.find linkMap s with Not_found -> LIDENT s
@@ -57,10 +36,9 @@
 let digit = ['0'-'9']
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
-let mathexpr = "+" | "-" | "*" | "/" | "<>" | "&&" | "||" | "==" | "<" | "<=" | ">" | ">=" | "="
 let sep = "(" | ")" | "{" | "}" | ";" | "."
 let other = lower | upper | digit | "'"
-let lident = lower other*  
+let lident = lower other*
 let uident = upper (other | '.')*
 let eol = '\n' | '\r' | "\r\n"
 
@@ -77,17 +55,68 @@ rule next_token = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
-    | lower+ | mathexpr | sep as id
-        { find_valeur id }
-
     | digit+ as n
         { CST (Cint (int_of_string n) ) }
     
     | lident as l
-        { LIDENT (l) }
+        { find_valeur l }
     
     | uident as u
         { UIDENT (u) }
+
+    | "+"
+        { BINOP (Badd) }
+
+    | "-"
+        { BINOP (Bsub) }
+
+    | "*"
+        { BINOP (Bmul) }
+
+    | "/"
+        { BINOP (Bdiv) }
+
+    | "<>"
+        { BINOP (Bneq) }
+
+    | "&&"
+        { BINOP (Band) }
+
+    | "||"
+        { BINOP (Bor) }
+
+    | "=="
+        { BINOP (Beq) }
+
+    | "<"
+        { BINOP (Blt) }
+
+    | "<="
+        { BINOP (Ble) }
+
+    | ">"
+        { BINOP (Bgt) }
+
+    | ">="
+        { BINOP (Bge) }
+
+    | "="
+        { EQUAL }
+        
+    | "("
+        { LEFTPAR }
+
+    | ")"
+        { RIGHTPAR }
+
+    | "{"
+        { LEFTBRACE }
+
+    | "}"
+        { RIGHTBRACE }
+
+    | ";"
+        { SEMICOLON }
     
     | "--"
         { comment_line lexbuf}
