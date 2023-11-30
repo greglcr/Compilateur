@@ -76,11 +76,11 @@ let rec print_file sa =
         try Printf.printf "%s " (Hashtbl.find linkMap sa)
         with Not_found -> raise (Print_error "binop")
 
-    and print_lident l = Printf.printf "%s" l
+    and print_lident l = Printf.printf "lident (%s)" l
 
-    and print_uident u = Printf.printf "%s" u
+    and print_uident u = Printf.printf "uident (%s)" u
 
-    and print_ident i = Printf.printf "%s" i in
+    and print_ident i = Printf.printf "ident (%s)" i in
 
     print_f sa
     

@@ -3,6 +3,6 @@
 (menhir
  (modules parser))
 (executable
- (name mini-pure-script)
+ (name minipurescript)
  (promote (until-clean))
  (flags ()))

@@ -1,7 +1,7 @@
-mini-pure-script.exe:
-	dune build mini-pure-script.exe
+minipurescript.exe:
+	dune build minipurescript.exe
 
 clean:
 	dune clean
 
-.PHONY: all clean mini-pure-script.exe
+.PHONY: all clean minipurescript.exe
