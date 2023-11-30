@@ -5,10 +5,9 @@
 
     exception Lexing_error of string
 
-
-    let find_valeur = 
-        let linkMap = Hashtbl.create 17 in
-        List.iter (fun (s, l) -> Hashtbl.add linkMap s l)
+    let resolve_keyword =
+        let keywords = Hashtbl.create 17 in
+        List.iter (fun (s, l) -> Hashtbl.add keywords s l)
                   (
                     [
                         ("case", CASE);
@@ -30,7 +29,7 @@
                         ("where", WHERE)
                     ]
                   );
-        fun s -> try Hashtbl.find linkMap s with Not_found -> LIDENT s
+        fun s -> try Hashtbl.find keywords s with Not_found -> LIDENT s
 }
 
 let digit = ['0'-'9']
@@ -58,7 +57,7 @@ rule next_token = parse
         { CST (Cint (int_of_string n) ) }
     
     | lident as l
-        { find_valeur l }
+        { resolve_keyword l }
     
     | uident as u
         { UIDENT (u) }
