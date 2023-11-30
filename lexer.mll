@@ -5,6 +5,8 @@
 
     exception Lexing_error of string
 
+    let string_buffer = Buffer.create 1024
+
     let resolve_keyword =
         let keywords = Hashtbl.create 17 in
         List.iter (fun (s, l) -> Hashtbl.add keywords s l)
@@ -67,6 +69,9 @@ rule next_token = parse
     
     | uident as u
         { UIDENT (u) }
+
+    | '"'
+        { CST (Cstring (string lexbuf)) }
 
     | "+"
         { BINOP (Badd) }
@@ -153,6 +158,27 @@ and block_comment = parse
 
     | _
         { block_comment lexbuf }
+
+and string = parse
+    | eol | eof
+        { raise (Lexing_error ("unterminated string")) }
+
+    | '"'
+        { let s = Buffer.contents string_buffer in
+          Buffer.reset string_buffer;
+          s }
+
+    | "\\n"
+        { Buffer.add_char string_buffer '\n';
+          string lexbuf }
+
+    | "\\\""
+        { Buffer.add_char string_buffer '"';
+          string lexbuf }
+
+    | _ as c
+        { Buffer.add_char string_buffer c;
+          string lexbuf }
 
 {
 
