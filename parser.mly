@@ -21,7 +21,9 @@
 %token SEMICOLON
 %token EOF
 %token <string> IDENT
-%token ARROW FATARROW
+%token ARROW FAT_ARROW
+%token TWO_PTS INTE_POINT
+%token POINT
 
 %start file (* Seules les fonctions qui sont placées après un start seront copiées dans le fichier .mli,
                 donc seules celles là pourront être appelées en dehors de ce fichier *)
@@ -46,16 +48,80 @@ import:
 decl:
     | d = defn
         { DECLdefn (d) }
+    
+    | td = tdecl
+        { DECLtdecl (td) }
+
+    | DATA u1 = uident lli = list(lident) EQUAL WHERE lpair = nonempty_list(uident_latype)
+        { DECLdata (u1, lli, lpair) }
+
+    | CLASS u = uident lli = list(lident) WHERE LEFTBRACE ltde = list(tdecl) SEMICOLON RIGHTBRACE
+        { DECLclass (u, lli, ltde) }
+    
+    | INSTANCE i = instance WHERE LEFTBRACE ld = list(tdecl) SEMICOLON RIGHTBRACE
+        { DECLinstance (i, ld) }
 ;
 
+uident_latype:
+    | u = uident latp = list(atype)
+        { (u, latp) }
 
 defn:
-    | lid = lident p = list (partag) EQUAL e = expr
-        { DEF (lid, p, e) } 
+    | lid = lident p = list (patarg) EQUAL e = expr
+        { DEF (lid, p, e) }
 ;
 
+tdecl:
+    | li = lident TWO_PTS LEFTPAR FORALL lli = nonempty_list(lident) POINT RIGHTPAR INTE_POINT
+      ld = list(ntype_fatarrow) lt = list(tp_arrow) t = tp
+        { TDECL (li, lli, ld, lt, t) }
+;
 
-partag:
+ntype_fatarrow:
+    | nt = ntype FAT_ARROW
+        { nt }
+;
+
+tp_arrow:
+    | t = tp ARROW
+        { t }
+;
+
+ntype:
+    | u = uident la = nonempty_list(atype)
+        { NTP (u, la) }
+;
+
+atype:
+    | l = lident
+        { ATl (l) }
+    
+    | u = uident
+        { ATu (u) }
+    
+    | LEFTPAR t = tp RIGHTPAR
+        { ATt (t) }
+;
+
+tp:
+    | at = atype
+        { TPa (at) }
+    
+    | nt = ntype
+        { TPn (nt) }
+;
+
+instance:
+    | nt = ntype
+        { INSTntp (nt) }
+    
+    | nt1 = ntype FAT_ARROW nt2 = ntype
+        { INSTntpc (nt1, nt2) }
+    
+    | LEFTPAR lnt = list(ntype) RIGHTPAR FAT_ARROW nt = ntype
+        { INSTntpcc (lnt, nt) }
+
+patarg:
     | c = constant
         { PATARconst (c) }
     
@@ -64,6 +130,21 @@ partag:
     
     | u = uident
         { PATARuid (u) }
+    
+    | LEFTPAR p = pattern RIGHTPAR
+        { PATARpat (p) }
+;
+
+pattern:
+    | p = patarg
+        { PATERpatar (p) }
+    
+    | u = uident lp = nonempty_list(patarg)
+        { PATERjspquelnom (u, lp) }    
+
+constant:
+    | c = CST
+        { c }
 ;
 
 atom:
@@ -78,7 +159,7 @@ atom:
     
     | LEFTPAR e = expr RIGHTPAR
         { Aexpr (e) }
-;    
+;
 
 expr:
     | a = atom
@@ -102,8 +183,8 @@ expr:
     | LET LEFTBRACE lbi = nonempty_list(binding) SEMICOLON RIGHTBRACE IN e = expr
         { Eaffect (lbi, e) }
     
-    (* | CASE e = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
-        { Ecase (e, lbranch) } *)
+     | CASE e = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
+        { Ecase (e, lbranch) }
 ;
 
 binding:
@@ -111,25 +192,22 @@ binding:
         { Baffect (l, e) }
 
 branch:
-    | p = pattern ARROW expr
-        { }
-
-constant:
-    | c = CST
-        { c }
-;
-
+    | p = pattern ARROW e = expr
+        { Barrow (p, e) }
 
 lident:
     | s = LIDENT
         { s }
 ;
 
-
 uident:
     | s = UIDENT
         { s }
 ;
+
+ident:
+    | s = IDENT
+        { s }
     
 
 

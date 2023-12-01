@@ -133,7 +133,16 @@ rule next_token = parse
 
     | ";"
         { SEMICOLON }
+
+    | "::"
+        { TWO_PTS }
     
+    | "?"
+        { INTE_POINT }
+    
+    | "."
+        { POINT }
+
     | eof
         { EOF }
 

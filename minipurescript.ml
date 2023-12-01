@@ -3,49 +3,74 @@ open Lexing
 open Parser
 open Lexer
 open Ast
-
-
+    
 exception Print_error of string
 
 let rec print_file sa = 
 
-    let rec print_f sa = 
+let rec print_f sa = 
         Printf.printf "Fprogramm (";
         let Fprogramm (l) = sa in
         List.iter (fun x -> print_decl x)
                     l;  
         Printf.printf ")";
-    
+
     and print_decl = function
         | DECLdefn d -> Printf.printf "DECLdefn ("; print_defn d; Printf.printf ")"
         | _ -> raise (Print_error "decl")
-    
+
     and print_defn = function
         | DEF (lid, lpat, e) -> Printf.printf "DEF (";
                                 print_lident lid;
                                 List.iter (fun x -> print_patarg x) lpat;
                                 print_expr e;
                                 Printf.printf ")";
+
+    and print_tdecl = function
+        | _ -> raise (Print_error "tdecl")
+
+    and print_ntype = function
+        | _ -> raise (Print_error "ntype")
     
+    and print_atype = function
+        | _-> raise (Print_error "atype")
+    
+    and print_tp = function
+        | _ -> raise (Print_error "tp")
+    
+    and print_instance = function
+        | _ -> raise (Print_error "instance")
+
     and print_patarg = function
         | PATARconst c -> Printf.printf "PATARconst (";
-                          print_const c;
-                          Printf.printf ")";
+                        print_const c;
+                        Printf.printf ")";
         | _ -> raise (Print_error "patarg")
+
+    and print_pattern = function
+        | PATERpatar (p) -> Printf.printf "PATERpatar ("; print_patarg p;
+                            Printf.printf ")";
+        | PATERjspquelnom (u, lp) -> Printf.printf "PATERjspquelnom ("; print_uident u;
+                                    List.iter (fun x -> print_patarg x) lp;
+                                    Printf.printf ")";
 
     and print_expr = function
         | Ebinop(b, e1, e2) -> Printf.printf "Ebinop ("; print_binop b; print_expr e1;
                                 print_expr e2; Printf.printf ") "
         | Eatom (a) -> Printf.printf "Eatom ("; print_atom a; Printf.printf ")";
         | _ -> raise (Print_error "expr")
-    
+
+    and print_branch = function
+        | Barrow (p, e) -> Printf.printf "Barrow ("; print_pattern p; print_expr e;
+                            Printf.printf ")"; 
+
     and print_atom = function
         | Aconst (c) -> Printf.printf "Aconst ("; print_const c; Printf.printf ")";
         | Alident (l) -> Printf.printf "Alident ("; print_lident l; Printf.printf ")";
         | Auident (u) -> Printf.printf "Auident ("; print_uident u; Printf.printf ")";
         | Aexpr (e) -> Printf.printf "Aexpr ("; print_expr e; Printf.printf ")";
         | _ -> raise (Print_error "atom")
-    
+
     and print_const = function
         | Cbool(false) -> Printf.printf "Cbool (false) "
         | Cbool(true) -> Printf.printf "Cbool (true) "
@@ -83,13 +108,4 @@ let rec print_file sa =
     and print_ident i = Printf.printf "ident (%s)" i in
 
     print_f sa
-    
-let () = Lexer.print_lexeme "test1.purs"
-
-let () = 
-    let f = "test1.purs" in
-    let c = open_in f in
-    let lb = Lexing.from_channel c in
-    let f = Parser.file Lexer.next_token lb in
-    print_file f;;
 

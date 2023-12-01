@@ -14,10 +14,10 @@ type file = Fprogramm of decl list (* module Main where { ⟨imports⟩ ⟨decl�
 and decl = 
   | DECLdefn of defn
   | DECLtdecl of tdecl
-  | DECLdata of uident * (lident list) * uident * (atype list) (* data <uident> <lident>* = (<uident> <atype>* )+ *)
+  | DECLdata of uident * (lident list) * (uident * (atype list)) list (* data <uident> <lident>* = (<uident> <atype>* )+ *)
   | DECLclass of uident * (lident list) * (tdecl list) (* class <uident> <lident>* where { <tdecl>*; } ici les deux listes
                                                       peuvent être éventuellement vides *)
-  | Dinstance of instance * (tdecl list) (* instance <instance> where { <defn>*; } *)
+  | DECLinstance of instance * (tdecl list) (* instance <instance> where { <defn>*; } *)
 
 and defn = DEF of lident * (patarg list) * expr (* <lident> <partag>* = expr *)
 
