@@ -9,14 +9,11 @@
                             correspondant aux constantes de la syntaxe abstraite car il n'y a qu'une seule
                             possibilité *)
 
-%token <Ast.binop> BINOP (* Pareil *)
-
-%token CASE CLASS DATA DO ELSE FALSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN TRUE WHERE
+%token CASE CLASS DATA DO ELSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN WHERE
 %token <string> LIDENT UIDENT
 %token LEFTPAR RIGHTPAR
 %token LEFTBRACE RIGHTBRACE
 %token EOF
-%token <string> IDENT
 %token ARROW FAT_ARROW
 %token SEMICOLON COLON_COLON QUESTION DOT
 

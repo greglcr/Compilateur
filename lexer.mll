@@ -196,8 +196,6 @@ let _menhir_print_token : token -> string =
         "AMP_AMP"
     | ARROW ->
         "ARROW"
-    | BINOP _ ->
-        "BINOP"
     | CASE ->
         "CASE"
     | CLASS ->
@@ -220,8 +218,6 @@ let _menhir_print_token : token -> string =
         "EQ"
     | EQ_EQ ->
         "EQ_EQ"
-    | FALSE ->
-        "FALSE"
     | FAT_ARROW ->
         "FAT_ARROW"
     | FORALL ->
@@ -230,8 +226,6 @@ let _menhir_print_token : token -> string =
         "GREATER"
     | GREATER_EQ ->
         "GREATER_EQ"
-    | IDENT _ ->
-        "IDENT"
     | IF ->
         "IF"
     | IMPORT ->
@@ -280,8 +274,6 @@ let _menhir_print_token : token -> string =
         "STAR"
     | THEN ->
         "THEN"
-    | TRUE ->
-        "TRUE"
     | UIDENT _ ->
         "UIDENT"
     | WHERE ->
