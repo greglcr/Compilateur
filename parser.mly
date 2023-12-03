@@ -11,8 +11,7 @@
                             possibilité *)
 
 %token <Ast.binop> BINOP (* Pareil *)
-%token MINUS (* Seul token qu'on doit traiter à part car c'est le seul qui peut être utilisé devant une
-                expression *)
+
 %token EQUAL
 %token CASE CLASS DATA DO ELSE FALSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN TRUE WHERE
 %token <string> LIDENT UIDENT
@@ -25,9 +24,22 @@
 %token TWO_PTS INTE_POINT
 %token POINT
 
-%start file (* Seules les fonctions qui sont placées après un start seront copiées dans le fichier .mli,
-                donc seules celles là pourront être appelées en dehors de ce fichier *)
+%token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
+%token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE
 
+%nonassoc IN ELSE
+%left PIPE_PIPE
+%left AMP_AMP
+%nonassoc EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
+%left PLUS MINUS LESS_GREATER
+%left STAR SLASH
+%nonassoc UNARY_MINUS
+
+(* 
+ Seules les fonctions qui sont placées après un start seront copiées dans le fichier .mli,
+ donc seules celles là pourront être appelées en dehors de ce fichier.
+*)
+%start file
 %type <Ast.file> file
 
 %%
@@ -171,7 +183,7 @@ expr:
     | u = uident la = nonempty_list(atom)
         { Emodule (u, la) }
     
-    | e1 = expr b = BINOP e2 = expr
+    | e1 = expr b = binop e2 = expr
         { Ebinop (b, e1, e2) } 
 
     | IF e1 = expr THEN e2 = expr ELSE e3 = expr
@@ -210,5 +222,19 @@ ident:
         { s }
     
 
-
+%inline binop:
+| EQ_EQ { Beq }
+| SLASH_EQ { Bneq }
+| LESS { Blt }
+| LESS_EQ { Ble }
+| GREATER { Bgt }
+| GREATER_EQ { Bge }
+| PLUS { Badd }
+| MINUS { Bsub }
+| STAR { Bmul }
+| SLASH { Bdiv }
+| LESS_GREATER { Bconcat }
+| AMP_AMP { Band }
+| PIPE_PIPE { Bor }
+;
  

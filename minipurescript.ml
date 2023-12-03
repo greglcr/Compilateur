@@ -113,7 +113,6 @@ let rec print_file sa =
                             (Bsub, "Bsub");
                             (Bmul, "Bmul");
                             (Bdiv, "Bdiv");
-                            (Bmod, "Bmod");
                             (Beq, "Beq");
                             (Bneq, "Bneq");
                             (Blt, "Blt");
@@ -121,7 +120,8 @@ let rec print_file sa =
                             (Bgt, "Bgt");
                             (Bge, "Bge");
                             (Band, "Band");
-                            (Bor, "Bor")
+                            (Bor, "Bor");
+                            (Bconcat, "Bconcat");
                         ]
                     )
             ;

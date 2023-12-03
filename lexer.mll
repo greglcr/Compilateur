@@ -75,43 +75,46 @@ rule next_token = parse
         { CST (Cstring (string lexbuf)) }
 
     | "+"
-        { BINOP (Badd) }
+        { PLUS }
 
     | "-"
-        { BINOP (Bsub) }
+        { MINUS }
 
     | "*"
-        { BINOP (Bmul) }
+        { STAR }
 
     | "/"
-        { BINOP (Bdiv) }
+        { SLASH }
 
     | "<>"
-        { BINOP (Bneq) }
+        { LESS_GREATER }
 
     | "&&"
-        { BINOP (Band) }
+        { AMP_AMP }
 
     | "||"
-        { BINOP (Bor) }
+        { PIPE_PIPE }
 
     | "=="
-        { BINOP (Beq) }
+        { EQ_EQ }
+
+    | "/="
+        { SLASH_EQ }
 
     | "<"
-        { BINOP (Blt) }
+        { LESS }
 
     | "<="
-        { BINOP (Ble) }
+        { LESS_EQ }
 
     | ">"
-        { BINOP (Bgt) }
+        { GREATER }
 
     | ">="
-        { BINOP (Bge) }
+        { GREATER_EQ }
 
     | "="
-        { EQUAL }
+        { EQ }
 
     | "->"
         { ARROW }
