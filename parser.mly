@@ -42,7 +42,7 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = nonempty_list(decl) SEMICOLON RIGHTBRACE EOF
+    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = decl+ SEMICOLON RIGHTBRACE EOF
         { Fprogramm d }
 ;
 
@@ -60,28 +60,28 @@ decl:
     | td = tdecl
         { DECLtdecl (td) }
 
-    | DATA u1 = UIDENT lli = list(LIDENT) EQ WHERE lpair = nonempty_list(uident_latype)
+    | DATA u1 = UIDENT lli = LIDENT* EQ WHERE lpair = uident_latype+
         { DECLdata (u1, lli, lpair) }
 
-    | CLASS u = UIDENT lli = list(LIDENT) WHERE LEFTBRACE ltde = list(tdecl) SEMICOLON RIGHTBRACE
+    | CLASS u = UIDENT lli = LIDENT* WHERE LEFTBRACE ltde = tdecl* SEMICOLON RIGHTBRACE
         { DECLclass (u, lli, ltde) }
     
-    | INSTANCE i = instance WHERE LEFTBRACE ld = list(tdecl) SEMICOLON RIGHTBRACE
+    | INSTANCE i = instance WHERE LEFTBRACE ld = tdecl* SEMICOLON RIGHTBRACE
         { DECLinstance (i, ld) }
 ;
 
 uident_latype:
-    | u = UIDENT latp = list(atype)
+    | u = UIDENT latp = atype*
         { (u, latp) }
 
 defn:
-    | lid = LIDENT p = list (patarg) EQ e = expr
+    | lid = LIDENT p = patarg* EQ e = expr
         { DEF (lid, p, e) }
 ;
 
 tdecl:
-    | li = LIDENT COLON_COLON LEFTPAR FORALL lli = nonempty_list(LIDENT) DOT RIGHTPAR QUESTION
-      ld = list(ntype_fatarrow) lt = list(tp_arrow) t = tp
+    | li = LIDENT COLON_COLON LEFTPAR FORALL lli = LIDENT+ DOT RIGHTPAR QUESTION
+      ld = ntype_fatarrow* lt = tp_arrow* t = tp
         { TDECL (li, lli, ld, lt, t) }
 ;
 
@@ -96,7 +96,7 @@ tp_arrow:
 ;
 
 ntype:
-    | u = UIDENT la = nonempty_list(atype)
+    | u = UIDENT la = atype+
         { NTP (u, la) }
 ;
 
@@ -126,7 +126,7 @@ instance:
     | nt1 = ntype FAT_ARROW nt2 = ntype
         { INSTntpc (nt1, nt2) }
     
-    | LEFTPAR lnt = list(ntype) RIGHTPAR FAT_ARROW nt = ntype
+    | LEFTPAR lnt = ntype* RIGHTPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
 
 patarg:
@@ -147,7 +147,7 @@ pattern:
     | p = patarg
         { PATERpatar (p) }
     
-    | u = UIDENT lp = nonempty_list(patarg)
+    | u = UIDENT lp = patarg+
         { PATERjspquelnom (u, lp) }    
 
 constant:
@@ -173,10 +173,10 @@ expr:
     | a = atom
         { Eatom (a) }
     
-    | l = LIDENT la = nonempty_list(atom)
+    | l = LIDENT la = atom+
         { Efonct (l, la) }
     
-    | u = UIDENT la = nonempty_list(atom)
+    | u = UIDENT la = atom+
         { Emodule (u, la) }
     
     | lhs = expr op = binop rhs = expr
@@ -185,13 +185,13 @@ expr:
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
         { Econd (cond, then_, else_) }
     
-    | DO LEFTBRACE le = nonempty_list(expr) SEMICOLON RIGHTBRACE
+    | DO LEFTBRACE le = expr+ SEMICOLON RIGHTBRACE
         { Edo (le) }
     
-    | LET LEFTBRACE lbi = nonempty_list(binding) SEMICOLON RIGHTBRACE IN e = expr
+    | LET LEFTBRACE lbi = binding+ SEMICOLON RIGHTBRACE IN e = expr
         { Eaffect (lbi, e) }
     
-     | CASE cond_ = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
+     | CASE cond_ = expr OF LEFTBRACE lbranch = branch+ SEMICOLON RIGHTBRACE
         { Ecase (cond_, lbranch) }
 ;
 
