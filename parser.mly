@@ -15,7 +15,7 @@
 %token LEFTBRACE RIGHTBRACE
 %token EOF
 %token ARROW FAT_ARROW
-%token SEMICOLON COLON_COLON QUESTION DOT
+%token SEMICOLON COLON_COLON QUESTION DOT COMMA
 
 %token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
 %token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE
@@ -39,16 +39,14 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = decl+ SEMICOLON RIGHTBRACE EOF
+    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = separated_nonempty_list(SEMICOLON, decl) RIGHTBRACE EOF
         { Fprogramm d }
 ;
-
 
 import:
     | IMPORT name = UIDENT SEMICOLON
         {}
 ;
-
 
 decl:
     | d = defn
@@ -77,9 +75,16 @@ defn:
 ;
 
 tdecl:
-    | li = LIDENT COLON_COLON LEFTPAR FORALL lli = LIDENT+ DOT RIGHTPAR QUESTION
+    | li = LIDENT COLON_COLON LEFTPAR lli = forall RIGHTPAR
       ld = ntype_fatarrow* lt = tp_arrow* t = tp
         { TDECL (li, lli, ld, lt, t) }
+;
+
+forall:
+    | FORALL vars = LIDENT+ DOT
+        { vars }
+    |
+        { [] }
 ;
 
 ntype_fatarrow:
@@ -93,7 +98,7 @@ tp_arrow:
 ;
 
 ntype:
-    | u = UIDENT la = atype+
+    | u = UIDENT la = atype*
         { NTP (u, la) }
 ;
 
@@ -123,7 +128,7 @@ instance:
     | nt1 = ntype FAT_ARROW nt2 = ntype
         { INSTntpc (nt1, nt2) }
     
-    | LEFTPAR lnt = ntype* RIGHTPAR FAT_ARROW nt = ntype
+    | LEFTPAR lnt = separated_nonempty_list(COMMA, ntype) RIGHTPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
 
 patarg:
@@ -170,11 +175,11 @@ expr:
     | a = atom
         { Eatom (a) }
     
-    | l = LIDENT la = atom+
-        { Efonct (l, la) }
+    | name = LIDENT args = atom+
+        { Efonct (name, args) }
     
-    | u = UIDENT la = atom+
-        { Emodule (u, la) }
+    | name = UIDENT args = atom+
+        { Emodule (name, args) }
 
     | MINUS e = expr %prec UNARY_MINUS
         { Ebinop (Bsub, Eatom (Aconst (Cint 0)), e) }
@@ -185,19 +190,19 @@ expr:
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
         { Econd (cond, then_, else_) }
     
-    | DO LEFTBRACE le = expr+ SEMICOLON RIGHTBRACE
-        { Edo (le) }
+    | DO LEFTBRACE body = separated_nonempty_list(SEMICOLON, expr) RIGHTBRACE
+        { Edo (body) }
     
-    | LET LEFTBRACE lbi = binding+ SEMICOLON RIGHTBRACE IN e = expr
-        { Eaffect (lbi, e) }
+    | LET LEFTBRACE bindings = separated_nonempty_list(SEMICOLON, binding) RIGHTBRACE IN e = expr
+        { Eaffect (bindings, e) }
     
-     | CASE cond_ = expr OF LEFTBRACE lbranch = branch+ SEMICOLON RIGHTBRACE
+     | CASE cond_ = expr OF LEFTBRACE lbranch = separated_nonempty_list(SEMICOLON, branch) RIGHTBRACE
         { Ecase (cond_, lbranch) }
 ;
 
 binding:
-    | l = LIDENT EQ e = expr
-        { Baffect (l, e) }
+    | name = LIDENT EQ e = expr
+        { Baffect (name, e) }
 
 branch:
     | p = pattern ARROW e = expr

@@ -137,6 +137,9 @@ rule next_token = parse
     | "?"
         { QUESTION }
     
+    | ","
+        { COMMA }
+    
     | "."
         { DOT }
 
@@ -205,6 +208,8 @@ let _menhir_print_token : token -> string =
         "CLASS"
     | COLON_COLON ->
         "COLON_COLON"
+    | COMMA ->
+        "COMMA"
     | CST _ ->
         "CST"
     | DATA ->
