@@ -60,10 +60,10 @@ decl:
     | td = tdecl
         { DECLtdecl (td) }
 
-    | DATA u1 = uident lli = list(lident) EQ WHERE lpair = nonempty_list(uident_latype)
+    | DATA u1 = UIDENT lli = list(LIDENT) EQ WHERE lpair = nonempty_list(uident_latype)
         { DECLdata (u1, lli, lpair) }
 
-    | CLASS u = uident lli = list(lident) WHERE LEFTBRACE ltde = list(tdecl) SEMICOLON RIGHTBRACE
+    | CLASS u = UIDENT lli = list(LIDENT) WHERE LEFTBRACE ltde = list(tdecl) SEMICOLON RIGHTBRACE
         { DECLclass (u, lli, ltde) }
     
     | INSTANCE i = instance WHERE LEFTBRACE ld = list(tdecl) SEMICOLON RIGHTBRACE
@@ -71,16 +71,16 @@ decl:
 ;
 
 uident_latype:
-    | u = uident latp = list(atype)
+    | u = UIDENT latp = list(atype)
         { (u, latp) }
 
 defn:
-    | lid = lident p = list (patarg) EQ e = expr
+    | lid = LIDENT p = list (patarg) EQ e = expr
         { DEF (lid, p, e) }
 ;
 
 tdecl:
-    | li = lident COLON_COLON LEFTPAR FORALL lli = nonempty_list(lident) DOT RIGHTPAR QUESTION
+    | li = LIDENT COLON_COLON LEFTPAR FORALL lli = nonempty_list(LIDENT) DOT RIGHTPAR QUESTION
       ld = list(ntype_fatarrow) lt = list(tp_arrow) t = tp
         { TDECL (li, lli, ld, lt, t) }
 ;
@@ -96,15 +96,15 @@ tp_arrow:
 ;
 
 ntype:
-    | u = uident la = nonempty_list(atype)
+    | u = UIDENT la = nonempty_list(atype)
         { NTP (u, la) }
 ;
 
 atype:
-    | l = lident
+    | l = LIDENT
         { ATl (l) }
     
-    | u = uident
+    | u = UIDENT
         { ATu (u) }
     
     | LEFTPAR t = tp RIGHTPAR
@@ -133,10 +133,10 @@ patarg:
     | c = constant
         { PATARconst (c) }
     
-    | l = lident
+    | l = LIDENT
         { PATARlid (l) }
     
-    | u = uident
+    | u = UIDENT
         { PATARuid (u) }
     
     | LEFTPAR p = pattern RIGHTPAR
@@ -147,7 +147,7 @@ pattern:
     | p = patarg
         { PATERpatar (p) }
     
-    | u = uident lp = nonempty_list(patarg)
+    | u = UIDENT lp = nonempty_list(patarg)
         { PATERjspquelnom (u, lp) }    
 
 constant:
@@ -159,10 +159,10 @@ atom:
     | c = constant
         { Aconst (c) }
 
-    | l = lident
+    | l = LIDENT
         { Alident (l) }
     
-    | u = uident
+    | u = UIDENT
         { Auident (u) }
     
     | LEFTPAR e = expr RIGHTPAR
@@ -173,10 +173,10 @@ expr:
     | a = atom
         { Eatom (a) }
     
-    | l = lident la = nonempty_list(atom)
+    | l = LIDENT la = nonempty_list(atom)
         { Efonct (l, la) }
     
-    | u = uident la = nonempty_list(atom)
+    | u = UIDENT la = nonempty_list(atom)
         { Emodule (u, la) }
     
     | lhs = expr op = binop rhs = expr
@@ -196,27 +196,12 @@ expr:
 ;
 
 binding:
-    | l = lident EQ e = expr
+    | l = LIDENT EQ e = expr
         { Baffect (l, e) }
 
 branch:
     | p = pattern ARROW e = expr
         { Barrow (p, e) }
-
-lident:
-    | s = LIDENT
-        { s }
-;
-
-uident:
-    | s = UIDENT
-        { s }
-;
-
-ident:
-    | s = IDENT
-        { s }
-    
 
 %inline binop:
 | EQ_EQ { Beq }
