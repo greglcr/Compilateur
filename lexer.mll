@@ -150,6 +150,9 @@ and line_comment = parse
     | eol
         { new_line lexbuf; next_token lexbuf }
 
+    | eof
+        { EOF }
+
     | _
         { line_comment lexbuf }
 
