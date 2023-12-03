@@ -134,9 +134,6 @@ rule next_token = parse
     | "::"
         { COLON_COLON }
     
-    | "?"
-        { QUESTION }
-    
     | ","
         { COMMA }
     
@@ -266,8 +263,6 @@ let _menhir_print_token : token -> string =
         "PIPE_PIPE"
     | PLUS ->
         "PLUS"
-    | QUESTION ->
-        "QUESTION"
     | RIGHTBRACE ->
         "RIGHTBRACE"
     | RIGHTPAR ->
