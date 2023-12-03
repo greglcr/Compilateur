@@ -20,13 +20,13 @@ let rec close weak stack pending_tokens c =
     else
         match Stack.top stack with
         | B n when n > c -> ignore (Stack.pop stack);
-                            Queue.add RIGHTBRACKET pending_tokens;
+                            Queue.add RIGHTBRACE pending_tokens;
                             close weak stack pending_tokens c
         | B n when n = c -> Queue.add SEMICOLON pending_tokens
         | _ -> ()
 
 let rec pop_until_m stack pending_tokens = match Stack.pop stack with
-        | B _ -> Queue.add RIGHTBRACKET pending_tokens;
+        | B _ -> Queue.add RIGHTBRACE pending_tokens;
                  pop_until_m stack pending_tokens
         | M -> ()
 
@@ -47,13 +47,13 @@ let next_token =
         ) else ( (* Otherwise, continue lexing from the source code *)
             let rec aux weak token c =
                 match token with
-                | IF | LEFTPAREN | CASE -> (
+                | IF | LEFTPAR | CASE -> (
                     close weak stack pending_tokens c;
                     Stack.push M stack;
                     Queue.add token pending_tokens
                 )
 
-                | RIGHTPAREN | ELSE | THEN | IN -> (
+                | RIGHTPAR | ELSE | THEN | IN -> (
                     pop_until_m stack pending_tokens;
 
                     if token = THEN then
@@ -71,7 +71,7 @@ let next_token =
                         pop_until_m stack pending_tokens;
 
                     Queue.add token pending_tokens;
-                    Queue.add LEFTBRACKET pending_tokens;
+                    Queue.add LEFTBRACE pending_tokens;
 
                     let token' = Lexer.next_token lexbuf in
                     let c' = token_column token' lexbuf in
