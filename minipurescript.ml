@@ -136,13 +136,24 @@ let rec print_file sa =
 
     print_f sa
 
+let show_tokens lb =
+    let token = ref (Post_lexer.next_token lb) in
+    while !token != EOF do
+        print_endline (_menhir_print_token !token);
+        token := Post_lexer.next_token lb
+    done
+
 let () = 
     let c = open_in file in
     let lb = Lexing.from_channel c in
     try
-        let f = Parser.file Post_lexer.next_token lb in
-        close_in c;
-        if !parse_only then exit 0;
+        if !lexing_only then (
+            show_tokens lb
+        ) else (
+            let f = Parser.file Post_lexer.next_token lb in
+            close_in c;
+            if !parse_only then exit 0;
+        )
     with
     | Lexer.Lexing_error s ->
         report (lexeme_start_p lb, lexeme_end_p lb);
