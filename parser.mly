@@ -5,7 +5,6 @@
 
 %}
 
-%token FILEINIT IMPORTINIT
 %token <Ast.constant> CST (* Lexème qui va retourner une constante. Ici on peut directement renvoyer le type
                             correspondant aux constantes de la syntaxe abstraite car il n'y a qu'une seule
                             possibilité *)
@@ -43,13 +42,13 @@
 
 
 file:
-    | FILEINIT LEFTBRACE i = import d = nonempty_list(decl) SEMICOLON RIGHTBRACE EOF
+    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = nonempty_list(decl) SEMICOLON RIGHTBRACE EOF
         { Fprogramm d }
 ;
 
 
 import:
-    | IMPORTINIT
+    | IMPORT name = UIDENT SEMICOLON
         {}
 ;
 

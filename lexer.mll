@@ -43,12 +43,6 @@ let uident = upper (other | '.')*
 let eol = '\n' | '\r' | "\r\n"
 
 rule next_token = parse
-    | "module Main where"
-        { FILEINIT }
-
-    | "import Prelude\nimport Effect\nimport Effect.Console"
-        { IMPORTINIT }
-
     | ['\t' ' ']
         { next_token lexbuf }
 
@@ -230,8 +224,6 @@ let _menhir_print_token : token -> string =
         "FALSE"
     | FAT_ARROW ->
         "FAT_ARROW"
-    | FILEINIT ->
-        "FILEINIT"
     | FORALL ->
         "FORALL"
     | GREATER ->
@@ -244,8 +236,6 @@ let _menhir_print_token : token -> string =
         "IF"
     | IMPORT ->
         "IMPORT"
-    | IMPORTINIT ->
-        "IMPORTINIT"
     | IN ->
         "IN"
     | INSTANCE ->
