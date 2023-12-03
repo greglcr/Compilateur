@@ -178,6 +178,9 @@ expr:
     
     | u = UIDENT la = atom+
         { Emodule (u, la) }
+
+    | MINUS e = expr %prec UNARY_MINUS
+        { Ebinop (Bsub, Eatom (Aconst (Cint 0)), e) }
     
     | lhs = expr op = binop rhs = expr
         { Ebinop (op, lhs, rhs) } 
