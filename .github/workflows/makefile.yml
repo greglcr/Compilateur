@@ -1,0 +1,32 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up OCaml
+      uses: ocaml/setup-ocaml@v2.1.7
+      with:
+        dune-cache: true
+
+    - name: Install menhir
+      run: opam install menhir
+
+    - name: Cache opam packages
+      id: cache-opam
+      uses: actions/cache@v3
+      with:
+        path: ~/.opam
+
+    - name: Build executable
+      run: make
