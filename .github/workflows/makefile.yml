@@ -9,14 +9,25 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+        ocaml-compiler:
+          - "5.1"
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up OCaml
-      uses: ocaml/setup-ocaml@v2.1.7
+    - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+      uses: ocaml/setup-ocaml@v2
       with:
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
         dune-cache: true
 
     - name: Install menhir
