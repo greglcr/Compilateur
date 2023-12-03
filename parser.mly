@@ -12,17 +12,14 @@
 
 %token <Ast.binop> BINOP (* Pareil *)
 
-%token EQUAL
 %token CASE CLASS DATA DO ELSE FALSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN TRUE WHERE
 %token <string> LIDENT UIDENT
 %token LEFTPAR RIGHTPAR
 %token LEFTBRACE RIGHTBRACE
-%token SEMICOLON
 %token EOF
 %token <string> IDENT
 %token ARROW FAT_ARROW
-%token TWO_PTS INTE_POINT
-%token POINT
+%token SEMICOLON COLON_COLON QUESTION DOT
 
 %token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
 %token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE
@@ -64,7 +61,7 @@ decl:
     | td = tdecl
         { DECLtdecl (td) }
 
-    | DATA u1 = uident lli = list(lident) EQUAL WHERE lpair = nonempty_list(uident_latype)
+    | DATA u1 = uident lli = list(lident) EQ WHERE lpair = nonempty_list(uident_latype)
         { DECLdata (u1, lli, lpair) }
 
     | CLASS u = uident lli = list(lident) WHERE LEFTBRACE ltde = list(tdecl) SEMICOLON RIGHTBRACE
@@ -79,12 +76,12 @@ uident_latype:
         { (u, latp) }
 
 defn:
-    | lid = lident p = list (patarg) EQUAL e = expr
+    | lid = lident p = list (patarg) EQ e = expr
         { DEF (lid, p, e) }
 ;
 
 tdecl:
-    | li = lident TWO_PTS LEFTPAR FORALL lli = nonempty_list(lident) POINT RIGHTPAR INTE_POINT
+    | li = lident COLON_COLON LEFTPAR FORALL lli = nonempty_list(lident) DOT RIGHTPAR QUESTION
       ld = list(ntype_fatarrow) lt = list(tp_arrow) t = tp
         { TDECL (li, lli, ld, lt, t) }
 ;
@@ -183,11 +180,11 @@ expr:
     | u = uident la = nonempty_list(atom)
         { Emodule (u, la) }
     
-    | e1 = expr b = binop e2 = expr
-        { Ebinop (b, e1, e2) } 
+    | lhs = expr op = binop rhs = expr
+        { Ebinop (op, lhs, rhs) } 
 
-    | IF e1 = expr THEN e2 = expr ELSE e3 = expr
-        { Econd (e1, e2, e3) }
+    | IF cond = expr THEN then_ = expr ELSE else_ = expr
+        { Econd (cond, then_, else_) }
     
     | DO LEFTBRACE le = nonempty_list(expr) SEMICOLON RIGHTBRACE
         { Edo (le) }
@@ -195,12 +192,12 @@ expr:
     | LET LEFTBRACE lbi = nonempty_list(binding) SEMICOLON RIGHTBRACE IN e = expr
         { Eaffect (lbi, e) }
     
-     | CASE e = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
-        { Ecase (e, lbranch) }
+     | CASE cond_ = expr OF LEFTBRACE lbranch = nonempty_list(branch) SEMICOLON RIGHTBRACE
+        { Ecase (cond_, lbranch) }
 ;
 
 binding:
-    | l = lident EQUAL e = expr
+    | l = lident EQ e = expr
         { Baffect (l, e) }
 
 branch:

@@ -138,13 +138,13 @@ rule next_token = parse
         { SEMICOLON }
 
     | "::"
-        { TWO_PTS }
+        { COLON_COLON }
     
     | "?"
-        { INTE_POINT }
+        { QUESTION }
     
     | "."
-        { POINT }
+        { DOT }
 
     | eof
         { EOF }
@@ -198,30 +198,46 @@ and string = parse
 let _menhir_print_token : token -> string =
   fun _tok ->
     match _tok with
+    | AMP_AMP ->
+        "AMP_AMP"
+    | ARROW ->
+        "ARROW"
     | BINOP _ ->
         "BINOP"
     | CASE ->
         "CASE"
     | CLASS ->
         "CLASS"
+    | COLON_COLON ->
+        "COLON_COLON"
     | CST _ ->
         "CST"
     | DATA ->
         "DATA"
     | DO ->
         "DO"
+    | DOT ->
+        "DOT"
     | ELSE ->
         "ELSE"
     | EOF ->
         "EOF"
-    | EQUAL ->
-        "EQUAL"
+    | EQ ->
+        "EQ"
+    | EQ_EQ ->
+        "EQ_EQ"
     | FALSE ->
         "FALSE"
+    | FAT_ARROW ->
+        "FAT_ARROW"
     | FILEINIT ->
         "FILEINIT"
     | FORALL ->
         "FORALL"
+    | GREATER ->
+        "GREATER"
+    | GREATER_EQ ->
+        "GREATER_EQ"
     | IDENT _ ->
         "IDENT"
     | IF ->
@@ -238,20 +254,40 @@ let _menhir_print_token : token -> string =
         "LEFTBRACE"
     | LEFTPAR ->
         "LEFTPAR"
+    | LESS ->
+        "LESS"
+    | LESS_EQ ->
+        "LESS_EQ"
+    | LESS_GREATER ->
+        "LESS_GREATER"
     | LET ->
         "LET"
     | LIDENT _ ->
         "LIDENT"
+    | MINUS ->
+        "MINUS"
     | MODULE ->
         "MODULE"
     | OF ->
         "OF"
+    | PIPE_PIPE ->
+        "PIPE_PIPE"
+    | PLUS ->
+        "PLUS"
+    | QUESTION ->
+        "QUESTION"
     | RIGHTBRACE ->
         "RIGHTBRACE"
     | RIGHTPAR ->
         "RIGHTPAR"
     | SEMICOLON ->
         "SEMICOLON"
+    | SLASH ->
+        "SLASH"
+    | SLASH_EQ ->
+        "SLASH_EQ"
+    | STAR ->
+        "STAR"
     | THEN ->
         "THEN"
     | TRUE ->
