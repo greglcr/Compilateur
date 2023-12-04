@@ -11,11 +11,11 @@
 
 %token CASE CLASS DATA DO ELSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN WHERE
 %token <string> LIDENT UIDENT
-%token LEFTPAR RIGHTPAR
-%token LEFTBRACE RIGHTBRACE
+%token LPAR RPAR
+%token LBRACE RBRACE
 %token EOF
 %token ARROW FAT_ARROW
-%token SEMICOLON COLON_COLON DOT COMMA
+%token SEMI COLON_COLON DOT COMMA
 
 %token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
 %token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE
@@ -39,12 +39,12 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LEFTBRACE i = import* d = separated_nonempty_list(SEMICOLON, decl) RIGHTBRACE EOF
+    | MODULE name = UIDENT WHERE LBRACE i = import* d = separated_nonempty_list(SEMI, decl) RBRACE EOF
         { Fprogramm d }
 ;
 
 import:
-    | IMPORT name = UIDENT SEMICOLON
+    | IMPORT name = UIDENT SEMI
         {}
 ;
 
@@ -58,10 +58,10 @@ decl:
     | DATA u1 = UIDENT lli = LIDENT* EQ WHERE lpair = uident_latype+
         { DECLdata (u1, lli, lpair) }
 
-    | CLASS u = UIDENT lli = LIDENT* WHERE LEFTBRACE ltde = tdecl* SEMICOLON RIGHTBRACE
+    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
         { DECLclass (u, lli, ltde) }
     
-    | INSTANCE i = instance WHERE LEFTBRACE ld = tdecl* SEMICOLON RIGHTBRACE
+    | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
         { DECLinstance (i, ld) }
 ;
 
@@ -75,7 +75,7 @@ defn:
 ;
 
 tdecl:
-    | li = LIDENT COLON_COLON LEFTPAR lli = forall RIGHTPAR
+    | li = LIDENT COLON_COLON LPAR lli = forall RPAR
       ld = ntype_fatarrow* lt = tp_arrow* t = tp
         { TDECL (li, lli, ld, lt, t) }
 ;
@@ -109,7 +109,7 @@ atype:
     | u = UIDENT
         { ATu (u) }
     
-    | LEFTPAR t = tp RIGHTPAR
+    | LPAR t = tp RPAR
         { ATt (t) }
 ;
 
@@ -128,7 +128,7 @@ instance:
     | nt1 = ntype FAT_ARROW nt2 = ntype
         { INSTntpc (nt1, nt2) }
     
-    | LEFTPAR lnt = separated_nonempty_list(COMMA, ntype) RIGHTPAR FAT_ARROW nt = ntype
+    | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
 
 patarg:
@@ -141,7 +141,7 @@ patarg:
     | u = UIDENT
         { PATARuid (u) }
     
-    | LEFTPAR p = pattern RIGHTPAR
+    | LPAR p = pattern RPAR
         { PATARpat (p) }
 ;
 
@@ -167,7 +167,7 @@ atom:
     | u = UIDENT
         { Auident (u) }
     
-    | LEFTPAR e = expr RIGHTPAR
+    | LPAR e = expr RPAR
         { Aexpr (e) }
 ;
 
@@ -190,13 +190,13 @@ expr:
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
         { Econd (cond, then_, else_) }
     
-    | DO LEFTBRACE body = separated_nonempty_list(SEMICOLON, expr) RIGHTBRACE
+    | DO LBRACE body = separated_nonempty_list(SEMI, expr) RBRACE
         { Edo (body) }
     
-    | LET LEFTBRACE bindings = separated_nonempty_list(SEMICOLON, binding) RIGHTBRACE IN e = expr
+    | LET LBRACE bindings = separated_nonempty_list(SEMI, binding) RBRACE IN e = expr
         { Eaffect (bindings, e) }
     
-     | CASE cond_ = expr OF LEFTBRACE lbranch = separated_nonempty_list(SEMICOLON, branch) RIGHTBRACE
+     | CASE cond_ = expr OF LBRACE lbranch = separated_nonempty_list(SEMI, branch) RBRACE
         { Ecase (cond_, lbranch) }
 ;
 

@@ -117,19 +117,19 @@ rule next_token = parse
         { FAT_ARROW }
         
     | "("
-        { LEFTPAR }
+        { LPAR }
 
     | ")"
-        { RIGHTPAR }
+        { RPAR }
 
     | "{"
-        { LEFTBRACE }
+        { LBRACE }
 
     | "}"
-        { RIGHTBRACE }
+        { RBRACE }
 
     | ";"
-        { SEMICOLON }
+        { SEMI }
 
     | "::"
         { COLON_COLON }
@@ -239,10 +239,10 @@ let _menhir_print_token : token -> string =
         "IN"
     | INSTANCE ->
         "INSTANCE"
-    | LEFTBRACE ->
-        "LEFTBRACE"
-    | LEFTPAR ->
-        "LEFTPAR"
+    | LBRACE ->
+        "LBRACE"
+    | LPAR ->
+        "LPAR"
     | LESS ->
         "LESS"
     | LESS_EQ ->
@@ -263,12 +263,12 @@ let _menhir_print_token : token -> string =
         "PIPE_PIPE"
     | PLUS ->
         "PLUS"
-    | RIGHTBRACE ->
-        "RIGHTBRACE"
-    | RIGHTPAR ->
-        "RIGHTPAR"
-    | SEMICOLON ->
-        "SEMICOLON"
+    | RBRACE ->
+        "RBRACE"
+    | RPAR ->
+        "RPAR"
+    | SEMI ->
+        "SEMI"
     | SLASH ->
         "SLASH"
     | SLASH_EQ ->
