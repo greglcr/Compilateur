@@ -37,7 +37,7 @@
 let whitespace = ['\t' ' ']
 let nonzero_digit = ['1'-'9']
 let digit = ['0'-'9']
-let integer = nonzero_digit digit*
+let integer = nonzero_digit digit* | '0'
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
 let other = lower | upper | digit | "'"
@@ -142,6 +142,9 @@ rule next_token = parse
     
     | "."
         { DOT }
+    
+    | "|"
+        { PIPE }
 
     | eof
         { EOF }
@@ -285,6 +288,8 @@ let _menhir_print_token : token -> string =
         "MODULE"
     | OF ->
         "OF"
+    | PIPE ->
+        "PIPE"
     | PIPE_PIPE ->
         "PIPE_PIPE"
     | PLUS ->
