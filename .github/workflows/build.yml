@@ -37,6 +37,7 @@ jobs:
       id: cache-opam
       uses: actions/cache@v3
       with:
+        key: ${{ matrix.os }}-${{ matrix.ocaml-compiler }}-build-${{ env.cache-name }}
         path: ~/.opam
 
     - name: Build executable
