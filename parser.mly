@@ -93,7 +93,7 @@ decl:
          { DECLinstance (i, ld) }
 ;
 
-atype_bis:
+atype:
     | name = LIDENT
         { Tvar (name) }
 
@@ -124,24 +124,18 @@ forall:
 ;
 
 ntype:
-    | name = UIDENT args = atype_bis*
-        { Tsymbol (name, args) }
-;
-
-atype:
-    | name = LIDENT
-        { Tvar (name) }
-
     | name = UIDENT args = atype*
         { Tsymbol (name, args) }
-
-    | LPAR t = typ RPAR
-        { t }
 ;
 
 typ:
-    | t = atype
-    //| t = ntype
+    | name = LIDENT
+        { Tvar (name) }
+
+    | name = UIDENT args = typ*
+        { Tsymbol (name, args) }
+
+    | LPAR t = typ RPAR
         { t }
 ;
 
