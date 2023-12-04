@@ -34,6 +34,7 @@
         fun s -> try Hashtbl.find keywords s with Not_found -> LIDENT s
 }
 
+let whitespace = ['\t' ' ']
 let nonzero_digit = ['1'-'9']
 let digit = ['0'-'9']
 let integer = nonzero_digit digit*;
@@ -45,7 +46,7 @@ let uident = upper (other | '.')*
 let eol = '\n' | '\r' | "\r\n"
 
 rule next_token = parse
-    | ['\t' ' ']
+    | whitespace
         { next_token lexbuf }
 
     | eol
@@ -184,13 +185,36 @@ and string = parse
         { Buffer.add_char string_buffer '\n';
           string lexbuf }
 
+    | "\\\\"
+        { Buffer.add_char string_buffer '\\';
+          string lexbuf }
+
     | "\\\""
         { Buffer.add_char string_buffer '"';
           string lexbuf }
 
+    | '\\'
+        { ignore_whitespace_in_string lexbuf }
+
     | _ as c
         { Buffer.add_char string_buffer c;
           string lexbuf }
+
+and ignore_whitespace_in_string = parse
+    | eol 
+        { raise (Lexing_error ("unterminated string")) }
+
+    | whitespace+
+        { ignore_whitespace_in_string lexbuf }
+
+    | eol
+        { new_line lexbuf; ignore_whitespace_in_string lexbuf }
+
+    | '\\'
+        { string lexbuf }
+
+    | _
+        { raise (Lexing_error ("unexpected character:" ^ String.make 1 c)) }
 
 {
 
