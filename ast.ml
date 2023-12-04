@@ -34,7 +34,7 @@ and instance =
 and pattern =
     | Pconst of constant
     | Pvar of string
-    | Psymbol of string * pattern list
+    | Papp of string * pattern list
 
 and constant =
     | Cbool of bool

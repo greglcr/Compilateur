@@ -49,7 +49,7 @@ let rec print_file sa =
         and print_defn = function
             | DEF (lid, lpat, e) -> Printf.printf "DEF (";
                                     print_lident lid;
-                                    List.iter (fun x -> print_patarg x) lpat;
+                                    List.iter (fun x -> print_pattern x) lpat;
                                     print_expr e;
                                     Printf.printf ")";
 
@@ -68,35 +68,34 @@ let rec print_file sa =
         and print_instance = function
             | _ -> raise (Print_error "instance")
 
-        and print_patarg = function
-            | PATARconst c -> Printf.printf "PATARconst (";
+        and print_pattern = function
+            | Pconst (c) -> Printf.printf "Pconst ("; 
                             print_const c;
                             Printf.printf ")";
-            | _ -> raise (Print_error "patarg")
-
-        and print_pattern = function
-            | PATERpatar (p) -> Printf.printf "PATERpatar ("; print_patarg p;
-                                Printf.printf ")";
-            | PATERjspquelnom (u, lp) -> Printf.printf "PATERjspquelnom ("; print_uident u;
-                                        List.iter (fun x -> print_patarg x) lp;
-                                        Printf.printf ")";
+            | Pvar (name) -> Printf.printf "Pvar ("; 
+                             print_uident name;
+                             Printf.printf ")";
+            | Papp (name, args) -> Printf.printf "Papp ("; 
+                                   print_uident name;
+                                   List.iter (fun x -> print_pattern x) args;
+                                   Printf.printf ")";
 
         and print_expr = function
-            | Ebinop(b, e1, e2) -> Printf.printf "Ebinop ("; print_binop b; print_expr e1;
-                                    print_expr e2; Printf.printf ") "
-            | Eatom (a) -> Printf.printf "Eatom ("; print_atom a; Printf.printf ")";
+            | Econst (c) -> Printf.printf "Econst (";
+                            print_const c;
+                            Printf.printf ")";
+            | Ebinop(b, e1, e2) -> Printf.printf "Ebinop ("; 
+                                    print_binop b; 
+                                    print_expr e1;
+                                    print_expr e2; 
+                                    Printf.printf ")"
             | _ -> raise (Print_error "expr")
 
         and print_branch = function
-            | Barrow (p, e) -> Printf.printf "Barrow ("; print_pattern p; print_expr e;
-                                Printf.printf ")"; 
-
-        and print_atom = function
-            | Aconst (c) -> Printf.printf "Aconst ("; print_const c; Printf.printf ")";
-            | Alident (l) -> Printf.printf "Alident ("; print_lident l; Printf.printf ")";
-            | Auident (u) -> Printf.printf "Auident ("; print_uident u; Printf.printf ")";
-            | Aexpr (e) -> Printf.printf "Aexpr ("; print_expr e; Printf.printf ")";
-            | _ -> raise (Print_error "atom")
+            | Barrow (p, e) -> Printf.printf "Barrow ("; 
+                               print_pattern p; 
+                               print_expr e;
+                               Printf.printf ")"; 
 
         and print_const = function
             | Cbool(false) -> Printf.printf "Cbool (false) "

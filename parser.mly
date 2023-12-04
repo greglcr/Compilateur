@@ -141,7 +141,7 @@ patarg:
         { Pvar (name) }
 
     | name = UIDENT
-        { Psymbol (name, []) }
+        { Papp (name, []) }
 
     | LPAR p = pattern RPAR
         { p }
@@ -152,7 +152,7 @@ pattern:
         { p }
 
     | name = UIDENT args = patarg+
-        { Psymbol (name, args) }
+        { Papp (name, args) }
 
 constant:
     | c = CST
