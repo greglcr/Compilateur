@@ -25,9 +25,11 @@ let rec close weak stack pending_tokens c =
         | B n when n = c -> Queue.add SEMI pending_tokens
         | _ -> ()
 
-let rec pop_until_m stack pending_tokens = match Stack.pop stack with
+let rec pop_until_m stack pending_tokens =
+    if not (Stack.is_empty stack) then
+        match Stack.pop stack with
         | B _ -> Queue.add RBRACE pending_tokens;
-                 pop_until_m stack pending_tokens
+                    pop_until_m stack pending_tokens
         | M -> ()
 
 let token_column token lexbuf =
