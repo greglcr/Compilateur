@@ -37,7 +37,7 @@
 let whitespace = ['\t' ' ']
 let nonzero_digit = ['1'-'9']
 let digit = ['0'-'9']
-let integer = nonzero_digit digit*;
+let integer = nonzero_digit digit*
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
 let other = lower | upper | digit | "'"
@@ -213,7 +213,7 @@ and ignore_whitespace_in_string = parse
     | '\\'
         { string lexbuf }
 
-    | _
+    | _ as c
         { raise (Lexing_error ("unexpected character:" ^ String.make 1 c)) }
 
 {
