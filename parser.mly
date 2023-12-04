@@ -58,8 +58,8 @@ decl:
     | td = tdecl
         { DECLtdecl (td) }
 
-    // | DATA u1 = UIDENT lli = LIDENT* EQ WHERE lpair = uident_latype+
-    //     { DECLdata (u1, lli, lpair) }
+    | DATA u1 = UIDENT lli = LIDENT* EQ WHERE nt = ntype+
+         { DECLdata (u1, lli, nt) }
 
     // | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
     //     { DECLclass (u, lli, ltde) }
@@ -92,7 +92,7 @@ forall:
 ;
 
 ntype_fatarrow:
-    | nt = ntype FAT_ARROW
+    | nt = typ FAT_ARROW
         { nt }
 ;
 
@@ -109,9 +109,6 @@ ntype:
 atype:
     | name = LIDENT
         { Tvar (name) }
-
-    | name = UIDENT
-        { Tsymbol (name, []) }
 
     | LPAR t = typ RPAR
         { t }
@@ -132,6 +129,7 @@ instance:
 
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
+    
 
 patarg:
     | c = constant

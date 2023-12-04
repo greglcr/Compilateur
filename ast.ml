@@ -13,7 +13,7 @@ type file = Fprogramm of decl list (* module Main where { ⟨imports⟩ ⟨decl�
 and decl =
     | DECLdefn of defn
     | DECLtdecl of tdecl
-    | DECLdata of uident * (lident list) * (uident * (typ list)) list (* data <uident> <lident>* = (<uident> <atype>* )+ *)
+    | DECLdata of uident * (lident list) * (typ list) (* data <uident> <lident>* = (<uident> <atype>* )+ *)
     | DECLclass of uident * (lident list) * (tdecl list) (* class <uident> <lident>* where { <tdecl>*; } ici les deux listes
                                                         peuvent être éventuellement vides *)
     | DECLinstance of instance * (tdecl list) (* instance <instance> where { <defn>*; } *)
