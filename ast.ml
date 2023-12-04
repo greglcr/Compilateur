@@ -1,21 +1,17 @@
-(* Syntaxe abstraite de minipurescript *)
+(* AST of MiniPureScript *)
+
+exception Semantic_error of string
 
 type lident = string
 type uident = string
 
-(* Vu que les import sont toujours pareil, il n'y a pas besoin de créer un type import, on voit seulement
-   le type file comme une suite de déclaration. La gestion des imports va être ajoutée directement dans les règles
-   de grammaire *)
-
-type file = Fprogramm of decl list (* module Main where { ⟨imports⟩ ⟨decl⟩+; } EOF, donc la liste doit être non
-                                      vide *)
+type file = Fprogram of decl list
 
 and decl =
     | DECLdefn of defn
     | DECLtdecl of tdecl
     | DECLdata of uident * (lident list) * (typ list) (* data <uident> <lident>* = (<uident> <atype>* )+ *)
-    | DECLclass of uident * (lident list) * (tdecl list) (* class <uident> <lident>* where { <tdecl>*; } ici les deux listes
-                                                        peuvent être éventuellement vides *)
+    | DECLclass of uident * (lident list) * (tdecl list) (* class <uident> <lident>* where { <tdecl>*; } *)
     | DECLinstance of instance * (defn list) (* instance <instance> where { <defn>*; } *)
 
 and defn = DEF of lident * (pattern list) * expr (* <lident> <partag>* = expr *)

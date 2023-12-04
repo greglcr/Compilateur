@@ -3,23 +3,28 @@
     open Ast
     open Format
 
+    module Imports = Set.Make(String)
+
 %}
 
-%token <Ast.constant> CST (* Lexème qui va retourner une constante. Ici on peut directement renvoyer le type
-                            correspondant aux constantes de la syntaxe abstraite car il n'y a qu'une seule
-                            possibilité *)
-
+(* Keywords *)
 %token CASE CLASS DATA DO ELSE FORALL IF IMPORT IN INSTANCE LET MODULE OF THEN WHERE
+
+(* Identifiers and constants *)
 %token <string> LIDENT UIDENT
-%token LPAR RPAR
-%token LBRACE RBRACE
+%token <Ast.constant> CST
+
+(* Punctuation *)
 %token EOF
+%token LPAR RPAR LBRACE RBRACE
 %token ARROW FAT_ARROW
 %token SEMI COLON_COLON DOT COMMA
 
+(* Operator tokens *)
 %token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
 %token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE PIPE
 
+(* Associativities and precedences *)
 %nonassoc IN ELSE
 %left PIPE_PIPE
 %left AMP_AMP
@@ -39,16 +44,36 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LBRACE
-        i = import*
-        decls = separated_nonempty_list(SEMI, decl)
+    | MODULE name = UIDENT WHERE LBRACE 
+        imports = imports
+        decls = separated_nonempty_list(SEMI, decl) 
       RBRACE EOF
-        { Fprogramm decls }
+        { 
+            if not (Imports.mem "Prelude" imports) then
+                raise (Semantic_error "missing 'import Prelude'");
+            if not (Imports.mem "Effect" imports) then
+                raise (Semantic_error "missing 'import Effect'");
+            if not (Imports.mem "Effect.Console" imports) then
+                raise (Semantic_error "missing 'import Effect.Console'");
+
+            if name <> "Main" then
+                raise (Semantic_error "expected 'Main' as module name");
+
+            Fprogram (decls) 
+        }
 ;
 
-import:
+imports:
     | IMPORT name = UIDENT SEMI
-        {}
+        {
+            (* For PureScript, duplicating imports is not an error. *)
+            Imports.singleton name
+        }
+
+    | i = imports IMPORT name = UIDENT SEMI
+        {
+            Imports.add name i
+        }
 ;
 
 decl:
@@ -96,16 +121,6 @@ forall:
 
     |
         { [] }
-;
-
-typ_fatarrow:   
-    | nt = ntype FAT_ARROW
-        { nt }
-;
-
-tp_arrow:
-    | t = typ ARROW
-        { t }
 ;
 
 ntype:

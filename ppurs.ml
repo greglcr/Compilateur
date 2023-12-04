@@ -37,7 +37,7 @@ let rec print_file sa =
 
     let rec print_f sa = 
             Printf.printf "Fprogramm (";
-            let Fprogramm (l) = sa in
+            let Fprogram (l) = sa in
             List.iter (fun x -> print_decl x)
                         l;  
             Printf.printf ")";
@@ -154,9 +154,13 @@ let () =
             if !parse_only then exit 0;
         )
     with
-    | Lexer.Lexing_error s ->
+    | Lexing_error s ->
         report (lexeme_start_p lb, lexeme_end_p lb);
         eprintf "lexical error: %s@." s;
+        exit 1
+    | Semantic_error s ->
+        report (lexeme_start_p lb, lexeme_end_p lb);
+        eprintf "semantic error: %s@." s;
         exit 1
     | Parser.Error ->
         report (lexeme_start_p lb, lexeme_end_p lb);
