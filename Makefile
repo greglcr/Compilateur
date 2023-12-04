@@ -9,6 +9,12 @@ ppurs: ppurs.exe
 syntax: ppurs
 	bash test.sh -1 ./ppurs
 
+typing: ppurs
+	bash test.sh -2 ./ppurs
+
+exec: ppurs
+	bash test.sh -3 ./ppurs
+
 clean:
 	rm ppurs
 	dune clean
