@@ -18,7 +18,7 @@
 %token SEMI COLON_COLON DOT COMMA
 
 %token EQ EQ_EQ SLASH_EQ LESS LESS_EQ GREATER GREATER_EQ
-%token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE
+%token PLUS MINUS STAR SLASH LESS_GREATER AMP_AMP PIPE_PIPE PIPE
 
 %nonassoc IN ELSE
 %left PIPE_PIPE
@@ -58,14 +58,25 @@ decl:
     | td = tdecl
         { DECLtdecl (td) }
 
-    | DATA u1 = UIDENT lli = LIDENT* EQ WHERE nt = ntype+
+    | DATA u1 = UIDENT lli = LIDENT* EQ nt = separated_nonempty_list(PIPE, typ)
          { DECLdata (u1, lli, nt) }
 
-    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
+    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = separated_list(SEMI, tdecl) RBRACE
         { DECLclass (u, lli, ltde) }
 
-    | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
+    | INSTANCE i = instance WHERE LBRACE ld = separated_list(SEMI, defn) RBRACE
          { DECLinstance (i, ld) }
+;
+
+atype_bis:
+    | name = LIDENT
+        { Tvar (name) }
+
+    | name = UIDENT
+        { Tsymbol (name, []) }
+
+    | LPAR t = typ RPAR
+        { t }
 ;
 
 defn:
@@ -74,9 +85,9 @@ defn:
 ;
 
 tdecl:
-    | li = LIDENT COLON_COLON LPAR lli = forall RPAR
-      ld = ntype_fatarrow* lt = tp_arrow* t = typ
-        { TDECL (li, lli, ld, lt, t) }
+    | li = LIDENT COLON_COLON lli = forall
+      separated_nonempty_list(ARROW, typ)
+        { TDECL (li, lli, [], [], Tvar "") }
 ;
 
 forall:
@@ -87,8 +98,8 @@ forall:
         { [] }
 ;
 
-ntype_fatarrow:
-    | nt = typ FAT_ARROW
+typ_fatarrow:   
+    | nt = ntype FAT_ARROW
         { nt }
 ;
 
@@ -98,7 +109,7 @@ tp_arrow:
 ;
 
 ntype:
-    | name = UIDENT args = atype*
+    | name = UIDENT args = atype_bis*
         { Tsymbol (name, args) }
 ;
 
@@ -106,13 +117,16 @@ atype:
     | name = LIDENT
         { Tvar (name) }
 
+    | name = UIDENT args = atype*
+        { Tsymbol (name, args) }
+
     | LPAR t = typ RPAR
         { t }
 ;
 
 typ:
     | t = atype
-    | t = ntype
+    //| t = ntype
         { t }
 ;
 
@@ -125,7 +139,7 @@ instance:
 
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
-    
+;
 
 patarg:
     | c = constant
