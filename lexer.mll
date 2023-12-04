@@ -201,7 +201,7 @@ and string = parse
           string lexbuf }
 
 and ignore_whitespace_in_string = parse
-    | eol 
+    | eof
         { raise (Lexing_error ("unterminated string")) }
 
     | whitespace+
