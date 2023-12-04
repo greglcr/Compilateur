@@ -2,3 +2,6 @@ _build/
 
 *.automaton
 *.conflicts
+
+ppurs.exe
+ppurs
