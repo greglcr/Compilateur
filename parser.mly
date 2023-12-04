@@ -61,16 +61,12 @@ decl:
     | DATA u1 = UIDENT lli = LIDENT* EQ WHERE nt = ntype+
          { DECLdata (u1, lli, nt) }
 
-    // | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
-    //     { DECLclass (u, lli, ltde) }
+    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
+        { DECLclass (u, lli, ltde) }
 
-    // | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
-    //     { DECLinstance (i, ld) }
+    | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
+         { DECLinstance (i, ld) }
 ;
-
-uident_latype:
-    | u = UIDENT latp = atype*
-        { (u, latp) }
 
 defn:
     | lid = LIDENT p = patarg* EQ e = expr
