@@ -28,7 +28,7 @@
 %left STAR SLASH
 %nonassoc UNARY_MINUS
 
-(* 
+(*
  Seules les fonctions qui sont placées après un start seront copiées dans le fichier .mli,
  donc seules celles là pourront être appelées en dehors de ce fichier.
 *)
@@ -39,8 +39,11 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LBRACE i = import* d = separated_nonempty_list(SEMI, decl) RBRACE EOF
-        { Fprogramm d }
+    | MODULE name = UIDENT WHERE LBRACE
+        i = import*
+        decls = separated_nonempty_list(SEMI, decl)
+      RBRACE EOF
+        { Fprogramm decls }
 ;
 
 import:
@@ -51,18 +54,18 @@ import:
 decl:
     | d = defn
         { DECLdefn (d) }
-    
+
     | td = tdecl
         { DECLtdecl (td) }
 
-    | DATA u1 = UIDENT lli = LIDENT* EQ WHERE lpair = uident_latype+
-        { DECLdata (u1, lli, lpair) }
+    // | DATA u1 = UIDENT lli = LIDENT* EQ WHERE lpair = uident_latype+
+    //     { DECLdata (u1, lli, lpair) }
 
-    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
-        { DECLclass (u, lli, ltde) }
-    
-    | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
-        { DECLinstance (i, ld) }
+    // | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = tdecl* SEMI RBRACE
+    //     { DECLclass (u, lli, ltde) }
+
+    // | INSTANCE i = instance WHERE LBRACE ld = tdecl* SEMI RBRACE
+    //     { DECLinstance (i, ld) }
 ;
 
 uident_latype:
@@ -76,13 +79,14 @@ defn:
 
 tdecl:
     | li = LIDENT COLON_COLON LPAR lli = forall RPAR
-      ld = ntype_fatarrow* lt = tp_arrow* t = tp
+      ld = ntype_fatarrow* lt = tp_arrow* t = typ
         { TDECL (li, lli, ld, lt, t) }
 ;
 
 forall:
     | FORALL vars = LIDENT+ DOT
         { vars }
+
     |
         { [] }
 ;
@@ -93,64 +97,62 @@ ntype_fatarrow:
 ;
 
 tp_arrow:
-    | t = tp ARROW
+    | t = typ ARROW
         { t }
 ;
 
 ntype:
-    | u = UIDENT la = atype*
-        { NTP (u, la) }
+    | name = UIDENT args = atype*
+        { Tsymbol (name, args) }
 ;
 
 atype:
-    | l = LIDENT
-        { ATl (l) }
-    
-    | u = UIDENT
-        { ATu (u) }
-    
-    | LPAR t = tp RPAR
-        { ATt (t) }
+    | name = LIDENT
+        { Tvar (name) }
+
+    | name = UIDENT
+        { Tsymbol (name, []) }
+
+    | LPAR t = typ RPAR
+        { t }
 ;
 
-tp:
-    | at = atype
-        { TPa (at) }
-    
-    | nt = ntype
-        { TPn (nt) }
+typ:
+    | t = atype
+    | t = ntype
+        { t }
 ;
 
 instance:
     | nt = ntype
         { INSTntp (nt) }
-    
+
     | nt1 = ntype FAT_ARROW nt2 = ntype
         { INSTntpc (nt1, nt2) }
-    
+
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
         { INSTntpcc (lnt, nt) }
 
 patarg:
     | c = constant
-        { PATARconst (c) }
-    
-    | l = LIDENT
-        { PATARlid (l) }
-    
-    | u = UIDENT
-        { PATARuid (u) }
-    
+        { Pconst (c) }
+
+    | name = LIDENT
+        { Pvar (name) }
+
+    | name = UIDENT
+        { Psymbol (name, []) }
+
     | LPAR p = pattern RPAR
-        { PATARpat (p) }
+        { p }
 ;
 
 pattern:
     | p = patarg
-        { PATERpatar (p) }
-    
-    | u = UIDENT lp = patarg+
-        { PATERjspquelnom (u, lp) }    
+        { p }
+
+    | name = UIDENT args = patarg+
+        { Psymbol (name, args) }
 
 constant:
     | c = CST
@@ -159,45 +161,43 @@ constant:
 
 atom:
     | c = constant
-        { Aconst (c) }
+        { Econst (c) }
 
-    | l = LIDENT
-        { Alident (l) }
-    
-    | u = UIDENT
-        { Auident (u) }
-    
+    | name = LIDENT
+        { Eapp (name, []) }
+
+    | name = UIDENT
+        { Eapp (name, []) }
+
     | LPAR e = expr RPAR
-        { Aexpr (e) }
+        { e }
 ;
 
 expr:
     | a = atom
-        { Eatom (a) }
-    
+        { a }
+
     | name = LIDENT args = atom+
-        { Efonct (name, args) }
-    
     | name = UIDENT args = atom+
-        { Emodule (name, args) }
+        { Eapp (name, args) }
 
     | MINUS e = expr %prec UNARY_MINUS
-        { Ebinop (Bsub, Eatom (Aconst (Cint 0)), e) }
-    
+        { Ebinop (Bsub, Econst (Cint 0), e) }
+
     | lhs = expr op = binop rhs = expr
-        { Ebinop (op, lhs, rhs) } 
+        { Ebinop (op, lhs, rhs) }
 
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
-        { Econd (cond, then_, else_) }
-    
+        { Eif (cond, then_, else_) }
+
     | DO LBRACE body = separated_nonempty_list(SEMI, expr) RBRACE
         { Edo (body) }
-    
+
     | LET LBRACE bindings = separated_nonempty_list(SEMI, binding) RBRACE IN e = expr
-        { Eaffect (bindings, e) }
-    
-     | CASE cond_ = expr OF LBRACE lbranch = separated_nonempty_list(SEMI, branch) RBRACE
-        { Ecase (cond_, lbranch) }
+        { Elet (bindings, e) }
+
+    | CASE cond = expr OF LBRACE lbranch = separated_nonempty_list(SEMI, branch) RBRACE
+        { Ecase (cond, lbranch) }
 ;
 
 binding:
@@ -223,4 +223,3 @@ branch:
 | AMP_AMP { Band }
 | PIPE_PIPE { Bor }
 ;
- 
