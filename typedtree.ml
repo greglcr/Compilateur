@@ -51,8 +51,8 @@ and expr =
     | Texpr_if of typed_expr * typed_expr * typed_expr
     (* do <exprs> *)
     | Texpr_do of typed_expr list
-    (* let <bindings> = <expr> *)
-    | Texpr_let of binding list * typed_expr
+    (* let <binding> = <expr> *)
+    | Texpr_let of binding * typed_expr
     (* case <expr> of <branches> *)
     | Texpr_case of typed_expr * pattern list
 
