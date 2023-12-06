@@ -22,11 +22,11 @@ let builtin_type_from_symbol s = match s with
     | _ -> None
 
 type typ =
-    | Tunit
-    | Tboolean
-    | Tint
-    | Tstring
-    | Teffect of typ
+    | Ttyp_unit
+    | Ttyp_boolean
+    | Ttyp_int
+    | Ttyp_string
+    | Ttyp_effect of typ
 
 type 'a typed_node = 
     {
@@ -37,10 +37,35 @@ type 'a typed_node =
     }
 
 and typed_expr = expr typed_node
+and typed_pattern = pattern typed_node
 
 and expr =
+    (* A constant, like an integer, a boolean or a string. *)
     | Texpr_constant of Ast.constant
+    (* <expr> <op> <expr> *)
     | Texpr_binary of Ast.binop * typed_expr * typed_expr
+    (* <name> OR <name> <exprs> 
+       This also include variable references. *)
     | Texpr_apply of string * (typed_expr list)
+    (* if <expr> then <expr> else <expr> *)
     | Texpr_if of typed_expr * typed_expr * typed_expr
+    (* do <exprs> *)
     | Texpr_do of typed_expr list
+    (* let <bindings> = <expr> *)
+    | Texpr_let of binding list * typed_expr
+    (* case <expr> of <branches> *)
+    | Texpr_case of typed_expr * pattern list
+
+(* <lident> = <expr> *)
+and binding = string * typed_expr
+
+and pattern =
+    (* e.g. 42 *)
+    | Tpattern_constant of Ast.constant
+    (* e.g. foo *)
+    | Tpattern_variable of string
+    (* e.g. foo or Bar 42 *)
+    | Tpattern_apply of string * typed_pattern list
+
+(* <pattern> -> <expr> *)
+and branch = typed_pattern * typed_expr
