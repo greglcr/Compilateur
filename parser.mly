@@ -5,6 +5,12 @@
 
     module Imports = Set.Make(String)
 
+    let create_lexeme_node (s, e) node =
+        {
+            start_loc = Location.from_lexing_position s;
+            end_loc = Location.from_lexing_position e;
+            node
+        }
 %}
 
 (* Keywords *)
@@ -93,17 +99,6 @@ decl:
          { DECLinstance (i, ld) }
 ;
 
-atype:
-    | name = LIDENT
-        { Tvar (name) }
-
-    | name = UIDENT
-        { Tsymbol (name, []) }
-
-    | LPAR t = typ RPAR
-        { t }
-;
-
 defn:
     | lid = LIDENT p = patarg* EQ e = expr
         { DEF (lid, p, e) }
@@ -112,7 +107,7 @@ defn:
 tdecl:
     | li = LIDENT COLON_COLON lli = forall
       separated_nonempty_list(ARROW, typ)
-        { TDECL (li, lli, [], [], Tvar "") }
+        { TDECL (li, lli, [], [], Ptyp_variable "") }
 ;
 
 forall:
@@ -123,17 +118,33 @@ forall:
         { [] }
 ;
 
+atype:
+    | name = LIDENT
+        { create_lexeme_node $loc(name) (Ptyp_variable (name)) }
+
+    | name = UIDENT
+        { create_lexeme_node $loc(name)
+            (Ptyp_apply (create_lexeme_node $loc(name) name, [])) }
+
+    | LPAR t = typ RPAR
+        { t }
+;
+
 ntype:
     | name = UIDENT args = atype*
-        { Tsymbol (name, args) }
+        { create_lexeme_node 
+            ($startpos(name), $endpos(args))
+            (Ptyp_apply (create_lexeme_node $loc(name) name, args)) }
 ;
 
 typ:
     | name = LIDENT
-        { Tvar (name) }
+        { create_lexeme_node $loc(name) (Ptyp_variable (name)) }
 
     | name = UIDENT args = typ*
-        { Tsymbol (name, args) }
+        { create_lexeme_node 
+            ($startpos(name), $endpos(args))
+            (Ptyp_apply (create_lexeme_node $loc(name) name, args)) }
 
     | LPAR t = typ RPAR
         { t }
@@ -141,24 +152,24 @@ typ:
 
 instance:
     | nt = ntype
-        { INSTntp (nt) }
+        { Pinstance (nt) }
 
     | nt1 = ntype FAT_ARROW nt2 = ntype
-        { INSTntpc (nt1, nt2) }
+        { Pinstance_dep ([nt1], nt2) }
 
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
-        { INSTntpcc (lnt, nt) }
+        { Pinstance_dep (lnt, nt) }
 ;
 
 patarg:
-    | c = constant
-        { Pconst (c) }
+    | c = CST
+        { create_lexeme_node $loc(c) (Ppattern_constant (c)) }
 
     | name = LIDENT
-        { Pvar (name) }
+        { create_lexeme_node $loc(name) (Ppattern_variable (name)) }
 
     | name = UIDENT
-        { Papp (name, []) }
+        { create_lexeme_node $loc(name) (Ppattern_apply (create_lexeme_node $loc(name) name, [])) }
 
     | LPAR p = pattern RPAR
         { p }
@@ -169,57 +180,64 @@ pattern:
         { p }
 
     | name = UIDENT args = patarg+
-        { Papp (name, args) }
-
-constant:
-    | c = CST
-        { c }
-;
+        { create_lexeme_node 
+            ($startpos(name), $endpos(args))
+            (Ppattern_apply (create_lexeme_node $loc(name) name, args)) }
 
 atom:
-    | c = constant
-        { Econst (c) }
+    | a = atom_internal
+        { create_lexeme_node $loc(a) a }
+
+(* atom without location *)
+atom_internal:
+    | c = CST
+        { Pexpr_constant (c) }
 
     | name = LIDENT
-        { Eapp (name, []) }
+        { Pexpr_apply (create_lexeme_node $loc(name) name, []) }
 
     | name = UIDENT
-        { Eapp (name, []) }
+        { Pexpr_apply (create_lexeme_node $loc(name) name, []) }
 
-    | LPAR e = expr RPAR
+    | LPAR e = expr_internal RPAR
         { e }
 ;
 
 expr:
-    | a = atom
+    | e = expr_internal
+        { create_lexeme_node $loc(e) e }
+
+(* expr without location *)
+expr_internal:
+    | a = atom_internal
         { a }
 
     | name = LIDENT args = atom+
     | name = UIDENT args = atom+
-        { Eapp (name, args) }
+        { Pexpr_apply (create_lexeme_node $loc(name) name, args) }
 
     | MINUS e = expr %prec UNARY_MINUS
-        { Ebinop (Bsub, Econst (Cint 0), e) }
+        { Pexpr_neg (e) }
 
     | lhs = expr op = binop rhs = expr
-        { Ebinop (op, lhs, rhs) }
+        { Pexpr_binary (create_lexeme_node $loc(op) op, lhs, rhs) }
 
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
-        { Eif (cond, then_, else_) }
+        { Pexpr_if (cond, then_, else_) }
 
     | DO LBRACE body = separated_nonempty_list(SEMI, expr) RBRACE
-        { Edo (body) }
+        { Pexpr_do (body) }
 
     | LET LBRACE bindings = separated_nonempty_list(SEMI, binding) RBRACE IN e = expr
-        { Elet (bindings, e) }
+        { Pexpr_let (bindings, e) }
 
     | CASE cond = expr OF LBRACE lbranch = separated_nonempty_list(SEMI, branch) RBRACE
-        { Ecase (cond, lbranch) }
+        { Pexpr_case (cond, lbranch) }
 ;
 
 binding:
     | name = LIDENT EQ e = expr
-        { (name, e) }
+        { (create_lexeme_node $loc(name) name, e) }
 
 branch:
     | p = pattern ARROW e = expr

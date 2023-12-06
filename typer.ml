@@ -25,7 +25,7 @@ let check_if_has_eq expr =
         raise (Error "expected Boolean, Int or String type")
 
 let rec expr = function
-    | Ast.Econst c -> (
+    | Ast.Pexpr_constant c -> (
         let t = match c with
             | Cbool _ -> Ttyp_boolean
             | Cint _ -> Ttyp_int
@@ -37,11 +37,11 @@ let rec expr = function
         }
     )
 
-    | Ast.Ebinop (op, lhs, rhs) -> (
-        let tlhs = expr lhs in
-        let trhs = expr rhs in
+    | Ast.Pexpr_binary (op, lhs, rhs) -> (
+        let tlhs = expr lhs.node in
+        let trhs = expr rhs.node in
 
-        let t = match op with
+        let t = match op.node with
             | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv -> (
                 check_if_int tlhs;
                 check_if_int trhs;
@@ -71,14 +71,14 @@ let rec expr = function
 
         {
             typ = t;
-            node = Texpr_binary (op, tlhs, trhs);
+            node = Texpr_binary (op.node, tlhs, trhs);
         }
     )
 
-    | Ast.Eif (cond, then_, else_) -> (
-        let tcond = expr cond in
-        let tthen = expr then_ in
-        let telse = expr else_ in
+    | Ast.Pexpr_if (cond, then_, else_) -> (
+        let tcond = expr cond.node in
+        let tthen = expr then_.node in
+        let telse = expr else_.node in
 
         if tthen <> telse then (
             raise (Error "else branch must have the same type as the then branch")
@@ -90,8 +90,8 @@ let rec expr = function
         }
     )
 
-    | Ast.Edo exprs -> (
-        let texprs = List.map expr exprs in
+    | Ast.Pexpr_do exprs -> (
+        let texprs = List.map (fun (e : Ast.located_expr) -> expr e.node) exprs in
         List.iter check_if_unit texprs;
         
         { 

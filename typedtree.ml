@@ -31,14 +31,12 @@ type typ =
 type 'a typed_node = 
     {
         (* The type of the tree node. *)
-        typ: typ;
+        typ : typ;
         (* The underlying node. *)
-        node: 'a;
+        node : 'a;
     }
 
 and typed_expr = expr typed_node
-and typed_pattern = pattern typed_node
-
 and expr =
     (* A constant, like an integer, a boolean or a string. *)
     | Texpr_constant of Ast.constant
@@ -59,12 +57,13 @@ and expr =
 (* <lident> = <expr> *)
 and binding = string * typed_expr
 
+and typed_pattern = pattern typed_node
 and pattern =
     (* e.g. 42 *)
     | Tpattern_constant of Ast.constant
     (* e.g. foo *)
     | Tpattern_variable of string
-    (* e.g. foo or Bar 42 *)
+    (* e.g. Bar 42 *)
     | Tpattern_apply of string * typed_pattern list
 
 (* <pattern> -> <expr> *)
