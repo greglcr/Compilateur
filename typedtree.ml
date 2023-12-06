@@ -30,14 +30,17 @@ type typ =
 
 type 'a typed_node = 
     {
+        (* The type of the tree node. *)
         typ: typ;
+        (* The underlying node. *)
         node: 'a;
     }
 
 and typed_expr = expr typed_node
 
 and expr =
-    | Texp_constant of Ast.constant
-    | Texp_binary of Ast.binop * typed_expr * typed_expr
-    | Texp_if of typed_expr * typed_expr * typed_expr
-    | Texp_do of typed_expr list
+    | Texpr_constant of Ast.constant
+    | Texpr_binary of Ast.binop * typed_expr * typed_expr
+    | Texpr_apply of string * (typed_expr list)
+    | Texpr_if of typed_expr * typed_expr * typed_expr
+    | Texpr_do of typed_expr list

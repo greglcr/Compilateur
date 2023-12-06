@@ -31,7 +31,7 @@ let rec expr = function
         in
         {
             typ = t;
-            node = Texp_constant c;
+            node = Texpr_constant c;
         }
     )
 
@@ -69,7 +69,7 @@ let rec expr = function
 
         {
             typ = t;
-            node = Texp_binary (op, tlhs, trhs);
+            node = Texpr_binary (op, tlhs, trhs);
         }
     )
 
@@ -84,7 +84,7 @@ let rec expr = function
 
         { 
             typ = tthen.typ;
-            node = Texp_if (tcond, tthen, telse);
+            node = Texpr_if (tcond, tthen, telse);
         }
     )
 
@@ -94,7 +94,7 @@ let rec expr = function
         
         { 
             typ = Tunit;
-            node = Texp_do texprs;
+            node = Texpr_do texprs;
         }
     )
 
