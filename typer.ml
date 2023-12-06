@@ -2,8 +2,9 @@ open Typedtree
 
 exception Error of string
 
-let effect_unit = Ttyp_effect Ttyp_unit
+module SMap = Map.Make(String)
 
+let effect_unit = Ttyp_effect (Ttyp_unit)
 let check_if_unit expr = 
     if expr.typ <> effect_unit then
         raise (Error "expected Effect Unit type")
@@ -24,7 +25,7 @@ let check_if_has_eq expr =
     if (expr.typ <> Ttyp_boolean) || (expr.typ <> Ttyp_int) || (expr.typ <> Ttyp_string) then
         raise (Error "expected Boolean, Int or String type")
 
-let rec expr = function
+let rec expr state = function
     | Ast.Econst c -> (
         let t = match c with
             | Cbool _ -> Ttyp_boolean
@@ -38,8 +39,8 @@ let rec expr = function
     )
 
     | Ast.Ebinop (op, lhs, rhs) -> (
-        let tlhs = expr lhs in
-        let trhs = expr rhs in
+        let tlhs = expr state lhs in
+        let trhs = expr state rhs in
 
         let t = match op with
             | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv -> (
@@ -76,9 +77,9 @@ let rec expr = function
     )
 
     | Ast.Eif (cond, then_, else_) -> (
-        let tcond = expr cond in
-        let tthen = expr then_ in
-        let telse = expr else_ in
+        let tcond = expr state cond in
+        let tthen = expr state then_ in
+        let telse = expr state else_ in
 
         if tthen <> telse then (
             raise (Error "else branch must have the same type as the then branch")
@@ -91,15 +92,22 @@ let rec expr = function
     )
 
     | Ast.Edo exprs -> (
-        let texprs = List.map expr exprs in
+        let texprs = List.map (expr state) exprs in
         List.iter check_if_unit texprs;
         
         { 
-            typ = (Ttyp_effect Ttyp_unit);
+            typ = Ttyp_unit;
             node = Texpr_do texprs;
         }
-    )
+    ) 
 
+    (*| Ast.Elet (bl, e) -> (
+         let t = match bl with
+            | [] -> expr state e
+            | (l, e) :: rl -> expr (SMap.add l (expr state e) state) (Ast.Elet (rl, e))
+        in t
+    ) *)
+    
     | _ -> raise (Error "not yet implemented")
 
 let rec decl = function
