@@ -3,16 +3,19 @@ open Lexing
 open Parser
 open Lexer
 open Ast
+open Typedtree
 
 let usage = "usage: ppurs [options] file.purs"
 
 let lexing_only = ref false
 let parse_only = ref false
+let typing_only = ref false
 
 let spec =
     [
         "--lexing-only", Arg.Set lexing_only, "  stop after lexing and print all tokens";
         "--parse-only", Arg.Set parse_only, "  stop after parsing";
+        "--typing-only", Arg.Set typing_only, "  stop after typing";
     ]
 
 let file =
@@ -30,7 +33,7 @@ let report (b,e) =
     let fc = b.pos_cnum - b.pos_bol + 1 in
     let lc = e.pos_cnum - b.pos_bol + 1 in
     eprintf "File \"%s\", line %d, characters %d-%d:\n" file l fc lc
-    
+
 exception Print_error of string
 
 let rec print_file sa = 
@@ -152,6 +155,8 @@ let () =
             let f = Parser.file Post_lexer.next_token lb in
             close_in c;
             if !parse_only then exit 0;
+            let typed_f = Typer.file f in
+            if !typing_only then exit 0;
         )
     with
     | Lexing_error s ->
@@ -165,4 +170,8 @@ let () =
     | Parser.Error ->
         report (lexeme_start_p lb, lexeme_end_p lb);
         eprintf "syntax error@.";
+        exit 1
+    | Typer.Error s ->
+        report (lexeme_start_p lb, lexeme_end_p lb);
+        eprintf "typing error: %s@." s;
         exit 1
