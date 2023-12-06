@@ -101,12 +101,18 @@ let rec expr state = function
         }
     ) 
 
-    (*| Ast.Elet (bl, e) -> (
-         let t = match bl with
+    | Ast.Elet (bl, e) -> (
+        match bl with
             | [] -> expr state e
-            | (l, e) :: rl -> expr (SMap.add l (expr state e) state) (Ast.Elet (rl, e))
-        in t
-    ) *)
+            | (l, vl) :: r -> let tb = expr state vl in
+                              let te = expr (SMap.add l tb.typ state) (Ast.Elet (r, e)) in
+                              {
+                                typ = te.typ;
+                                node = Texpr_let ((l, tb), te);
+                              }
+
+                            
+    )
     
     | _ -> raise (Error "not yet implemented")
 
