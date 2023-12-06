@@ -2,32 +2,34 @@ open Typedtree
 
 exception Error of string
 
+let effect_unit = Ttyp_effect Ttyp_unit
+
 let check_if_unit expr = 
-    if expr.typ <> Tunit then
+    if expr.typ <> effect_unit then
         raise (Error "expected Effect Unit type")
 
 let check_if_int expr = 
-    if expr.typ <> Tint then
+    if expr.typ <> Ttyp_int then
         raise (Error "expected Int type")
 
 let check_if_string expr = 
-    if expr.typ <> Tstring then
+    if expr.typ <> Ttyp_string then
         raise (Error "expected String type")
 
 let check_if_boolean expr = 
-    if expr.typ <> Tboolean then
+    if expr.typ <> Ttyp_boolean then
         raise (Error "expected Boolean type")
 
 let check_if_has_eq expr = 
-    if (expr.typ <> Tboolean) || (expr.typ <> Tint) || (expr.typ <> Tstring) then
+    if (expr.typ <> Ttyp_boolean) || (expr.typ <> Ttyp_int) || (expr.typ <> Ttyp_string) then
         raise (Error "expected Boolean, Int or String type")
 
 let rec expr = function
     | Ast.Econst c -> (
         let t = match c with
-            | Cbool _ -> Tboolean
-            | Cint _ -> Tint
-            | Cstring _ -> Tstring
+            | Cbool _ -> Ttyp_boolean
+            | Cint _ -> Ttyp_int
+            | Cstring _ -> Ttyp_string
         in
         {
             typ = t;
@@ -43,27 +45,27 @@ let rec expr = function
             | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv -> (
                 check_if_int tlhs;
                 check_if_int trhs;
-                Tint
+                Ttyp_int
             )
             | Ast.Bconcat -> (
                 check_if_string tlhs;
                 check_if_string trhs;
-                Tstring
+                Ttyp_string
             )
             | Ast.Beq | Ast.Bneq -> (
                 check_if_has_eq tlhs;
                 check_if_has_eq trhs;
-                Tboolean
+                Ttyp_boolean
             )
             | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge -> (
                 check_if_int tlhs;
                 check_if_int trhs;
-                Tboolean
+                Ttyp_boolean
             )
             | Ast.Bor | Ast.Band -> (
                 check_if_boolean tlhs;
                 check_if_boolean trhs;
-                Tboolean
+                Ttyp_boolean
             )
         in
 
@@ -93,7 +95,7 @@ let rec expr = function
         List.iter check_if_unit texprs;
         
         { 
-            typ = Tunit;
+            typ = (Ttyp_effect Ttyp_unit);
             node = Texpr_do texprs;
         }
     )
