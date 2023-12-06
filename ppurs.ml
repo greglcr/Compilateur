@@ -95,7 +95,7 @@ let rec print_file sa =
             | _ -> raise (Print_error "expr")
 
         and print_branch = function
-            | Barrow (p, e) -> Printf.printf "Barrow ("; 
+            | (p, e) -> Printf.printf "("; 
                                print_pattern p; 
                                print_expr e;
                                Printf.printf ")"; 

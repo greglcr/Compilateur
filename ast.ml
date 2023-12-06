@@ -52,9 +52,9 @@ and expr =
     | Elet of (binding list) * expr   (* let { <bindings> } in <expr> *)
     | Ecase of expr * (branch list)   (* case <expr> of { <branchs> } *)
 
-and binding = Baffect of lident * expr (* <lident> = <expr> *)
+and binding = lident * expr (* <lident> = <expr> *)
 
-and branch = Barrow of pattern * expr (* <pattern> -> <expr>  *)
+and branch = pattern * expr (* <pattern> -> <expr>  *)
 
 and binop =
     | Badd | Bsub | Bmul | Bdiv           (* + - * / *)

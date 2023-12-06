@@ -219,11 +219,11 @@ expr:
 
 binding:
     | name = LIDENT EQ e = expr
-        { Baffect (name, e) }
+        { (name, e) }
 
 branch:
     | p = pattern ARROW e = expr
-        { Barrow (p, e) }
+        { (p, e) }
 
 %inline binop:
 | EQ_EQ { Beq }
