@@ -4,8 +4,7 @@ exception Semantic_error of string
 
 type 'a located_node =
     {
-        start_loc : Location.t;
-        end_loc : Location.t;
+        range : Location.t * Location.t;
         node : 'a;
     }
 

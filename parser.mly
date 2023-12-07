@@ -7,8 +7,7 @@
 
     let create_lexeme_node (s, e) node =
         {
-            start_loc = Location.from_lexing_position s;
-            end_loc = Location.from_lexing_position e;
+            range = (Location.from_lexing_position s, Location.from_lexing_position e);
             node
         }
 %}
