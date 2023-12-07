@@ -2,9 +2,6 @@
 
 exception Semantic_error of string
 
-type lident = string
-type uident = string
-
 type 'a located_node =
     {
         start_loc : Location.t;
@@ -14,27 +11,33 @@ type 'a located_node =
 
 type file = Fprogram of decl list
 
-and decl =
-    | DECLdefn of defn
-    | DECLtdecl of tdecl
-    | DECLdata of uident * (lident list) * (located_typ list) (* data <uident> <lident>* = (<uident> <atype>* )+ *)
-    | DECLclass of uident * (lident list) * (tdecl list) (* class <uident> <lident>* where { <tdecl>*; } *)
-    | DECLinstance of instance * (defn list) (* instance <instance> where { <defn>*; } *)
+and ident = string located_node
 
-and defn = DEF of lident * (located_pattern list) * located_expr (* <lident> <partag>* = expr *)
+and decl = decl_node located_node
+and decl_node =
+    (* Function declaration 
+       <lident> <partag>* = expr *)
+    | Pdecl_func of ident * (pattern list) * expr
+    (* Function signature 
+       <lident> :: (forall <lident>+ .)? (<ntype> =>)* (<type> ->)* <type> *)
+    | Pdecl_func_signature of ident * (ident list) * (typ list) * (typ list) * typ
+    (* Data declaration
+       data <uident> <lident>* = (<uident> <atype>* )+ *)
+    | Pdecl_data of ident * (ident list) * (typ list) 
+    (* Class declaration
+       class <uident> <lident>* where { <tdecl>*; } *)
+    | Pdecl_class of ident * (ident list) * (decl list) 
+    (* Instance declaration
+       instance <instance> where { <defn>*; } *)
+    | Pdecl_instance of instance * (decl list)
 
-and tdecl = TDECL of lident * (lident list) * (typ list) * (typ list) * typ (* <lident> :: (forall <lident>+ .)?
-                                                                                (<ntype> =>)* (<type> ->)* <type> *)
-and located_typ = typ located_node
-and typ =
+and typ = typ_node located_node
+and typ_node =
     | Ptyp_variable of string
-    | Ptyp_apply of string located_node * located_typ list
+    | Ptyp_apply of ident * typ list
 
-and instance =
-    (* <ntype> *)
-    | Pinstance of located_typ
-    (* (<ntype>+) => <ntype> *)
-    | Pinstance_dep of located_typ list * located_typ
+(* <ntype> OR (<ntype>+) => <ntype> *)
+and instance = typ list * typ option
 
 and constant =
     (* e.g. true or false *)
@@ -49,38 +52,38 @@ and constant =
      any argument.
    - A module or constructor call is the same as an function call.
 *)
-and located_expr = expr located_node
-and expr =
+and expr = expr_node located_node
+and expr_node =
     (* <constant> *)
     | Pexpr_constant of constant
     (* <expr> <op> <expr> *)
-    | Pexpr_binary of binop located_node * located_expr * located_expr
+    | Pexpr_binary of binop located_node * expr * expr
     (* - <expr> *)
-    | Pexpr_neg of located_expr
-    | Pexpr_apply of string located_node * located_expr list
+    | Pexpr_neg of expr
+    | Pexpr_apply of ident * expr list
     (* if e1 then e2 else e3 *)
-    | Pexpr_if of located_expr * located_expr * located_expr
+    | Pexpr_if of expr * expr * expr
     (* do <exprs> *)
-    | Pexpr_do of located_expr list
+    | Pexpr_do of expr list
     (* let <bindings> in <expr> *)
-    | Pexpr_let of binding list * located_expr
+    | Pexpr_let of binding list * expr
     (* case <expr> of <branchs> *)
-    | Pexpr_case of located_expr * branch list
+    | Pexpr_case of expr * branch list
 
 (* <lident> = <expr> *)
-and binding = string located_node * located_expr
+and binding = ident * expr
 
-and located_pattern = pattern located_node
-and pattern =
+and pattern = pattern_node located_node
+and pattern_node =
     (* e.g. 42 *)
     | Ppattern_constant of constant
     (* e.g. foo *)
     | Ppattern_variable of string
     (* e.g. Bar 42 *)
-    | Ppattern_apply of string located_node * located_pattern list
+    | Ppattern_apply of ident * pattern list
 
 (* <pattern> -> <expr> *)
-and branch = located_pattern * located_expr
+and branch = pattern * expr
 
 and binop =
     (* + - * / *)

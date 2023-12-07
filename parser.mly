@@ -84,34 +84,44 @@ imports:
 
 decl:
     | d = defn
-        { DECLdefn (d) }
+        { d }
 
     | td = tdecl
-        { DECLtdecl (td) }
+        { td }
 
-    | DATA u1 = UIDENT lli = LIDENT* EQ nt = separated_nonempty_list(PIPE, typ)
-         { DECLdata (u1, lli, nt) }
+    | d = decl_internal
+        { create_lexeme_node $loc(d) d }
+;
 
-    | CLASS u = UIDENT lli = LIDENT* WHERE LBRACE ltde = separated_list(SEMI, tdecl) RBRACE
-        { DECLclass (u, lli, ltde) }
+decl_internal:
+    | DATA name = uident lli = lident* EQ nt = separated_nonempty_list(PIPE, typ)
+         { Pdecl_data (name, lli, nt) }
+
+    | CLASS name = uident lli = lident* WHERE LBRACE ltde = separated_list(SEMI, tdecl) RBRACE
+        { Pdecl_class (name, lli, ltde) }
 
     | INSTANCE i = instance WHERE LBRACE ld = separated_list(SEMI, defn) RBRACE
-         { DECLinstance (i, ld) }
+         { Pdecl_instance (i, ld) }
 ;
 
 defn:
-    | lid = LIDENT p = patarg* EQ e = expr
-        { DEF (lid, p, e) }
+    | name = LIDENT p = patarg* EQ e = expr
+        { create_lexeme_node ($startpos(name), $endpos(e)) (Pdecl_func (create_lexeme_node $loc(name) name, p, e)) }
 ;
 
 tdecl:
-    | li = LIDENT COLON_COLON lli = forall
-      separated_nonempty_list(ARROW, typ)
-        { TDECL (li, lli, [], [], Ptyp_variable "") }
+    | name = lident COLON_COLON gen_vars = forall
+      typs = separated_nonempty_list(ARROW, typ)
+        {
+            let rev_typs = List.rev typs in
+            let last_typ = List.hd (List.rev typs) in
+            create_lexeme_node ($startpos(name), $endpos(typs)) (Pdecl_func_signature 
+                (name, gen_vars, [], List.rev (List.tl rev_typs), last_typ))
+        }
 ;
 
 forall:
-    | FORALL vars = LIDENT+ DOT
+    | FORALL vars = lident+ DOT
         { vars }
 
     |
@@ -131,20 +141,20 @@ atype:
 ;
 
 ntype:
-    | name = UIDENT args = atype*
+    | name = uident args = atype*
         { create_lexeme_node 
             ($startpos(name), $endpos(args))
-            (Ptyp_apply (create_lexeme_node $loc(name) name, args)) }
+            (Ptyp_apply (name, args)) }
 ;
 
 typ:
     | name = LIDENT
         { create_lexeme_node $loc(name) (Ptyp_variable (name)) }
 
-    | name = UIDENT args = typ*
+    | name = uident args = typ*
         { create_lexeme_node 
             ($startpos(name), $endpos(args))
-            (Ptyp_apply (create_lexeme_node $loc(name) name, args)) }
+            (Ptyp_apply (name, args)) }
 
     | LPAR t = typ RPAR
         { t }
@@ -152,13 +162,13 @@ typ:
 
 instance:
     | nt = ntype
-        { Pinstance (nt) }
+        { [ nt ], None }
 
     | nt1 = ntype FAT_ARROW nt2 = ntype
-        { Pinstance_dep ([nt1], nt2) }
+        { ([nt1], Some nt2) }
 
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
-        { Pinstance_dep (lnt, nt) }
+        { (lnt, Some nt) }
 ;
 
 patarg:
@@ -179,10 +189,10 @@ pattern:
     | p = patarg
         { p }
 
-    | name = UIDENT args = patarg+
+    | name = uident args = patarg+
         { create_lexeme_node 
             ($startpos(name), $endpos(args))
-            (Ppattern_apply (create_lexeme_node $loc(name) name, args)) }
+            (Ppattern_apply (name, args)) }
 
 atom:
     | a = atom_internal
@@ -193,11 +203,11 @@ atom_internal:
     | c = CST
         { Pexpr_constant (c) }
 
-    | name = LIDENT
-        { Pexpr_apply (create_lexeme_node $loc(name) name, []) }
+    | name = lident
+        { Pexpr_apply (name, []) }
 
-    | name = UIDENT
-        { Pexpr_apply (create_lexeme_node $loc(name) name, []) }
+    | name = uident
+        { Pexpr_apply (name, []) }
 
     | LPAR e = expr_internal RPAR
         { e }
@@ -212,9 +222,9 @@ expr_internal:
     | a = atom_internal
         { a }
 
-    | name = LIDENT args = atom+
-    | name = UIDENT args = atom+
-        { Pexpr_apply (create_lexeme_node $loc(name) name, args) }
+    | name = lident args = atom+
+    | name = uident args = atom+
+        { Pexpr_apply (name, args) }
 
     | MINUS e = expr %prec UNARY_MINUS
         { Pexpr_neg (e) }
@@ -236,12 +246,22 @@ expr_internal:
 ;
 
 binding:
-    | name = LIDENT EQ e = expr
-        { (create_lexeme_node $loc(name) name, e) }
+    | name = lident EQ e = expr
+        { (name, e) }
 
 branch:
     | p = pattern ARROW e = expr
         { (p, e) }
+
+lident:
+    | ident = LIDENT
+        { create_lexeme_node $loc(ident) ident }
+;
+
+uident:
+    | ident = UIDENT
+        { create_lexeme_node $loc(ident) ident }
+;
 
 %inline binop:
 | EQ_EQ { Beq }
