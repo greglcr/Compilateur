@@ -28,6 +28,7 @@ type typ =
     | Ttyp_string
     | Ttyp_effect of typ
     | Ttyp_var of tvar
+    | Ttyp_function of typ list * typ
 
 and tvar = 
     {
