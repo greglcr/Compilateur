@@ -14,6 +14,12 @@ There many simplications over the real PureScript about the typing:
         case e1, e2 of ...
     Therefore, functions using multiple patterns as arguments are not allowed.
 *)
+module V = struct
+    type t = tvar
+    let compare v1 v2 = Stdlib.compare v1.id v2.id
+    let equal v1 v2 = v1.id = v2.id
+    let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
+end
 
 type env =
     {
@@ -263,3 +269,43 @@ let file decls =
     let functions_name = List.of_seq (SSet.to_seq (SSet.of_seq (Hashtbl.to_seq_keys functions))) in
     let compressed_functions = List.map (fun name -> compress_function functions name) functions_name in
     ()
+
+let rec head = function
+    | Ttyp_var { def = Some t } -> head t
+    | t -> t
+
+(* 
+let rec canon t = match head t with
+    | Ttyp_unit | Ttyp_boolean | Ttyp_int | Ttyp_string as t -> t
+    | Ttyp_effect t -> Ttyp_effect (canon t)
+    | Ttyp_var tv -> Ttyp_var ({ id = tv.id; def = canon (head tv.def) })
+*)
+
+
+let rec occur v t = match head t with
+    | Ttyp_var w -> V.equal v w
+    | _ -> false
+
+
+exception UnificationFailure of Typedtree.typ * Typedtree.typ
+let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
+
+let rec unify t1 t2 = match head t1, head t2 with
+    | Ttyp_int, Ttyp_int 
+    | Ttyp_boolean, Ttyp_boolean 
+    | Ttyp_string, Ttyp_string
+    | Ttyp_unit, Ttyp_unit -> ()
+    | Ttyp_var v1, Ttyp_var v2 when V.equal v1 v2 -> ()
+    | (Ttyp_var v1 as t1), t2 -> if occur v1 t2 then unification_error t1 t2;
+                                 assert (v1.def = None);
+                                v1.def <- Some t2
+    | t1, (Ttyp_var v2 as t2) -> unify t2 t1
+    | Ttyp_function (pl1, e1), Ttyp_function (pl2, e2) -> unify_params pl1 pl2;
+                                                                  unify e1 e2
+    | _ -> ()
+
+and unify_params p1 p2 = match (p1, p2) with
+    | [], [] -> ()
+    | t1::r1, t2::r2 -> unify t1 t2; unify_params r1 r2
+    | [], _ 
+    | _, [] -> raise (Error ((Location.dummy, Location.dummy), "not the same number of parameters"))
