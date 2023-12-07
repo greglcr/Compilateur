@@ -43,6 +43,12 @@ and 'a typed_node =
         node : 'a;
     }
 
+and decl = decl_node typed_node
+and decl_node =
+    | Tdecl_function of string * param list * expr
+
+and param = string typed_node
+
 and expr = expr_node typed_node
 and expr_node =
     (* A constant, like an integer, a boolean or a string. *)

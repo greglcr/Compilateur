@@ -3,6 +3,12 @@ type t = {
     colno : int;
 }
 
+let dummy = 
+    { 
+        lineno = 0;
+        colno = 0;
+    }
+
 let from_lexing_position (p : Lexing.position) =
     {
         lineno = p.pos_lnum;
