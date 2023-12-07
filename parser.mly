@@ -7,8 +7,7 @@
 
     let create_lexeme_node (s, e) node =
         {
-            start_loc = Location.from_lexing_position s;
-            end_loc = Location.from_lexing_position e;
+            range = (Location.from_lexing_position s, Location.from_lexing_position e);
             node
         }
 %}
@@ -50,22 +49,23 @@
 
 
 file:
-    | MODULE name = UIDENT WHERE LBRACE 
+    | MODULE name = uident WHERE LBRACE 
         imports = imports
         decls = separated_nonempty_list(SEMI, decl) 
       RBRACE EOF
         { 
+            let dummy_range = Location.dummy, Location.dummy in
             if not (Imports.mem "Prelude" imports) then
-                raise (Semantic_error "missing 'import Prelude'");
+                raise (Semantic_error (dummy_range, "missing 'import Prelude'"));
             if not (Imports.mem "Effect" imports) then
-                raise (Semantic_error "missing 'import Effect'");
+                raise (Semantic_error (dummy_range, "missing 'import Effect'"));
             if not (Imports.mem "Effect.Console" imports) then
-                raise (Semantic_error "missing 'import Effect.Console'");
+                raise (Semantic_error (dummy_range, "missing 'import Effect.Console'"));
 
-            if name <> "Main" then
-                raise (Semantic_error "expected 'Main' as module name");
+            if name.node <> "Main" then
+                raise (Semantic_error (name.range, "expected 'Main' as module name"));
 
-            Fprogram (decls) 
+            decls
         }
 ;
 

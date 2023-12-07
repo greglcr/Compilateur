@@ -59,17 +59,17 @@ let () =
         let s = Location.lexeme_start lb in
         let e = Location.lexeme_end lb in
         Location.print file s e;
-        eprintf "lexical error: %s@." msg;
+        eprintf "\x1b[1;31merror:\x1b[0m %s@." msg;
         exit 1
-    | Semantic_error s ->
-        report (lexeme_start_p lb, lexeme_end_p lb);
-        eprintf "semantic error: %s@." s;
+    | Semantic_error ((range_start, range_end), s) ->
+        Location.print file range_start range_end;
+        eprintf "\x1b[1;31merror:\x1b[0m %s@." s;
         exit 1
     | Parser.Error ->
         report (lexeme_start_p lb, lexeme_end_p lb);
-        eprintf "syntax error@.";
+        eprintf "\x1b[1;31merror:\x1b[0m syntax error@.";
         exit 1
-    | Typer.Error s ->
-        report (lexeme_start_p lb, lexeme_end_p lb);
-        eprintf "typing error: %s@." s;
+    | Typer.Error ((range_start, range_end), s) ->
+        Location.print file range_start range_end;
+        eprintf "\x1b[1;31merror:\x1b[0m %s@." s;
         exit 1

@@ -1,15 +1,14 @@
 (* AST of MiniPureScript *)
 
-exception Semantic_error of string
+exception Semantic_error of (Location.t * Location.t) * string
 
 type 'a located_node =
     {
-        start_loc : Location.t;
-        end_loc : Location.t;
+        range : Location.t * Location.t;
         node : 'a;
     }
 
-type file = Fprogram of decl list
+type file = decl list
 
 and ident = string located_node
 
