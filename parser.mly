@@ -65,7 +65,7 @@ file:
             if name <> "Main" then
                 raise (Semantic_error "expected 'Main' as module name");
 
-            Fprogram (decls) 
+            decls
         }
 ;
 

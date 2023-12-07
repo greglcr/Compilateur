@@ -9,7 +9,7 @@ type 'a located_node =
         node : 'a;
     }
 
-type file = Fprogram of decl list
+type file = decl list
 
 and ident = string located_node
 
