@@ -1,6 +1,6 @@
 (* AST of MiniPureScript *)
 
-exception Semantic_error of string
+exception Semantic_error of (Location.t * Location.t) * string
 
 type 'a located_node =
     {
