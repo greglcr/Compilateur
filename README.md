@@ -1,5 +1,7 @@
 # MiniPureScript
 
+Fait par Grégoire et Hubert
+
 ## Documentation (préliminaire)
 
 lexer.mll -> contient le lexer qui va retourner les tokens, codé en ocamllex. Dans ce fichier, il faut importer le parser
