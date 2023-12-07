@@ -27,8 +27,15 @@ type typ =
     | Ttyp_int
     | Ttyp_string
     | Ttyp_effect of typ
+    | Ttyp_var of tvar
 
-type 'a typed_node = 
+and tvar = 
+    {
+        id : int;
+        mutable def : typ option;
+    }
+
+and 'a typed_node = 
     {
         (* The type of the tree node. *)
         typ : typ;
