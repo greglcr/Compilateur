@@ -36,35 +36,35 @@ type 'a typed_node =
         node : 'a;
     }
 
-and typed_expr = expr typed_node
-and expr =
+and expr = expr_node typed_node
+and expr_node =
     (* A constant, like an integer, a boolean or a string. *)
     | Texpr_constant of Ast.constant
     (* <expr> <op> <expr> *)
-    | Texpr_binary of Ast.binop * typed_expr * typed_expr
+    | Texpr_binary of Ast.binop * expr * expr
     (* <name> OR <name> <exprs> 
        This also include variable references. *)
-    | Texpr_apply of string * (typed_expr list)
+    | Texpr_apply of string * (expr list)
     (* if <expr> then <expr> else <expr> *)
-    | Texpr_if of typed_expr * typed_expr * typed_expr
+    | Texpr_if of expr * expr * expr
     (* do <exprs> *)
-    | Texpr_do of typed_expr list
+    | Texpr_do of expr list
     (* let <binding> = <expr> *)
-    | Texpr_let of binding * typed_expr
+    | Texpr_let of binding * expr
     (* case <expr> of <branches> *)
-    | Texpr_case of typed_expr * pattern list
+    | Texpr_case of expr * pattern list
 
 (* <lident> = <expr> *)
-and binding = string * typed_expr
+and binding = string * expr
 
-and typed_pattern = pattern typed_node
-and pattern =
+and pattern = pattern_node typed_node
+and pattern_node =
     (* e.g. 42 *)
     | Tpattern_constant of Ast.constant
     (* e.g. foo *)
     | Tpattern_variable of string
     (* e.g. Bar 42 *)
-    | Tpattern_apply of string * typed_pattern list
+    | Tpattern_apply of string * pattern list
 
 (* <pattern> -> <expr> *)
-and branch = typed_pattern * typed_expr
+and branch = pattern * expr

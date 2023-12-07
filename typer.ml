@@ -1,8 +1,15 @@
 open Typedtree
+open Ast
 
 exception Error of string
 
 module SMap = Map.Make(String)
+module SSet = Set.Make(String)
+
+type env =
+    {
+        decls : (string, Ast.decl) Hashtbl.t
+    }
 
 let effect_unit = Ttyp_effect (Ttyp_unit)
 let check_if_unit expr = 
@@ -92,7 +99,7 @@ let rec expr state = function
     )
 
     | Ast.Pexpr_do exprs -> (
-        let texprs = List.map (fun (e : Ast.located_expr) -> expr state e.node) exprs in
+        let texprs = List.map (fun (e : Ast.expr) -> expr state e.node) exprs in
         List.iter check_if_unit texprs;
         
         { 
@@ -116,8 +123,45 @@ let rec expr state = function
     
     | _ -> raise (Error "not yet implemented")
 
-let rec decl = function
-    | _ -> ()
+let rec find_functions functions decls =
+    let handle_decl decl = match decl with
+        | Pdecl_func (name, patterns, expr) -> (
+            Hashtbl.add functions name.node decl
+        )
+        | Pdecl_func_signature _ -> ()
+        | _ -> ()
+    in match decls with
+    | [] -> functions
+    | decl::remaining -> (handle_decl decl.node); find_functions  functions remaining
+
+let type_func functions name =
+    let all_declarations = Hashtbl.find_all functions name in
+    (*
+       We use the following algorithm to simplify functions declarations :
+       - If there is a single declaration for the function => We do nothing.
+       - If not, we compress all the different declarations in a single function
+         declaration using the case expression. For example, if we have :
+            f a = e1
+            f b = e2
+            f c = e3
+
+         Then we "compress" it to :
+            f e =
+                case e of
+                | a -> e1
+                | b -> e2
+                | c -> e3
+
+         However, if two declarations does not have the same amount of patterns
+         or if at least one declaration have more than 1 pattern then we
+         emit an error. For example :
+            f a b = e1
+            f c d = e2
+            -- ERROR: we can not compress the two declarations into one
+    *)
 
 let file = function
-    | Ast.Fprogram decls -> List.map decl decls
+    | Ast.Fprogram decls -> 
+        let functions = find_functions (Hashtbl.create 31) decls in
+        let functions_name = SSet.of_seq (Hashtbl.to_seq_keys functions) in
+        SSet.iter (fun name -> type_func functions name) functions_name
