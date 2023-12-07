@@ -46,7 +46,7 @@ and 'a typed_node =
 
 and decl = decl_node typed_node
 and decl_node =
-    | Tdecl_function of string * param list * expr
+    | Tdecl_function of Ast.ident * param list * expr
 
 and param = string typed_node
 
@@ -58,7 +58,7 @@ and expr_node =
     | Texpr_binary of Ast.binop * expr * expr
     (* <name> OR <name> <exprs> 
        This also include variable references. *)
-    | Texpr_apply of string * (expr list)
+    | Texpr_apply of Ast.ident * (expr list)
     (* if <expr> then <expr> else <expr> *)
     | Texpr_if of expr * expr * expr
     (* do <exprs> *)
@@ -69,7 +69,7 @@ and expr_node =
     | Texpr_case of expr * pattern list
 
 (* <lident> = <expr> *)
-and binding = string * expr
+and binding = Ast.ident * expr
 
 and pattern = pattern_node typed_node
 and pattern_node =

@@ -21,6 +21,38 @@ module V = struct
     let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
 end
 
+let rec head = function
+    | Ttyp_var { def = Some t } -> head t
+    | t -> t
+
+let rec occur v t = match head t with
+    | Ttyp_var w -> V.equal v w
+    | _ -> false
+    exception UnificationFailure of Typedtree.typ * Typedtree.typ
+    let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
+    
+let rec unify t1 t2 = match head t1, head t2 with
+    | Ttyp_int, Ttyp_int 
+    | Ttyp_boolean, Ttyp_boolean 
+    | Ttyp_string, Ttyp_string
+    | Ttyp_unit, Ttyp_unit -> ()
+    | Ttyp_var v1, Ttyp_var v2 when V.equal v1 v2 -> ()
+    | (Ttyp_var v1 as t1), t2 -> 
+        if occur v1 t2 then unification_error t1 t2;
+        assert (v1.def = None);
+        v1.def <- Some t2
+    | t1, (Ttyp_var v2 as t2) -> unify t2 t1
+    | Ttyp_function (pl1, e1), Ttyp_function (pl2, e2) -> 
+        unify_params pl1 pl2;
+        unify e1 e2
+    | _ -> ()
+
+and unify_params p1 p2 = match (p1, p2) with
+    | [], [] -> ()
+    | t1::r1, t2::r2 -> unify t1 t2; unify_params r1 r2
+    | [], _ 
+    | _, [] -> raise (Error ((Location.dummy, Location.dummy), "not the same number of parameters"))
+
 type env =
     {
         decls : (string, Ast.decl) Hashtbl.t
@@ -59,7 +91,7 @@ let check_if_has_eq expr =
     if (expr.typ <> Ttyp_boolean) || (expr.typ <> Ttyp_int) || (expr.typ <> Ttyp_string) then
         raise (Error ((Location.dummy, Location.dummy), "expected Boolean, Int or String type"))
 
-let rec expr state = function
+let rec expr global_env state e = match e.node with
     | Ast.Pexpr_constant c -> (
         let t = match c with
             | Cbool _ -> Ttyp_boolean
@@ -73,18 +105,18 @@ let rec expr state = function
     )
 
     | Ast.Pexpr_binary (op, lhs, rhs) -> (
-        let tlhs = expr state lhs.node in
-        let trhs = expr state rhs.node in
+        let tlhs = expr global_env state lhs in
+        let trhs = expr global_env state rhs in
 
         let t = match op.node with
             | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv -> (
-                check_if_int tlhs;
-                check_if_int trhs;
+                unify tlhs.typ Ttyp_int;
+                unify trhs.typ Ttyp_int;
                 Ttyp_int
             )
             | Ast.Bconcat -> (
-                check_if_string tlhs;
-                check_if_string trhs;
+                unify tlhs.typ Ttyp_string;
+                unify trhs.typ Ttyp_string;
                 Ttyp_string
             )
             | Ast.Beq | Ast.Bneq -> (
@@ -93,13 +125,13 @@ let rec expr state = function
                 Ttyp_boolean
             )
             | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge -> (
-                check_if_int tlhs;
-                check_if_int trhs;
+                unify tlhs.typ Ttyp_int;
+                unify trhs.typ Ttyp_int;
                 Ttyp_boolean
             )
             | Ast.Bor | Ast.Band -> (
-                check_if_boolean tlhs;
-                check_if_boolean trhs;
+                unify tlhs.typ Ttyp_boolean;
+                unify trhs.typ Ttyp_boolean;
                 Ttyp_boolean
             )
         in
@@ -111,9 +143,11 @@ let rec expr state = function
     )
 
     | Ast.Pexpr_if (cond, then_, else_) -> (
-        let tcond = expr state cond.node in
-        let tthen = expr state then_.node in
-        let telse = expr state else_.node in
+        let tcond = expr global_env state cond in
+        let tthen = expr global_env state then_ in
+        let telse = expr global_env state else_ in
+
+        unify tcond.typ Ttyp_boolean;
 
         if tthen <> telse then (
             raise (Error (else_.range, "else branch must have the same type as the then branch"))
@@ -126,8 +160,8 @@ let rec expr state = function
     )
 
     | Ast.Pexpr_do exprs -> (
-        let texprs = List.map (fun (e : Ast.expr) -> expr state e.node) exprs in
-        List.iter check_if_unit texprs;
+        let texprs = List.map (fun (e : Ast.expr) -> expr global_env state e) exprs in
+        List.iter (fun t -> unify t.typ effect_unit) texprs;
 
         {
             typ = Ttyp_unit;
@@ -135,20 +169,39 @@ let rec expr state = function
         }
     )
 
-    | Ast.Pexpr_let (bl, e) -> (
-        match bl with
-            | [] -> expr state e.node
-            | (l, vl) :: r -> let tb = expr state vl.node in
-                              let te = expr (SMap.add l.node tb.typ state) (Ast.Pexpr_let (r, e)) in
-                              {
-                                typ = te.typ;
-                                node = Texpr_let ((l.node, tb), te);
-                              }
-
-
+    | Ast.Pexpr_let (bindings, e) -> (
+        match bindings with
+            | [] -> expr global_env state e
+            | (name, value) :: r -> 
+                let typed_binding = expr global_env state value in
+                let typed_expr = expr global_env
+                    (SMap.add name.node typed_binding.typ state)
+                    {
+                        range = e.range;
+                        node = (Ast.Pexpr_let (r, e));
+                    }
+                in
+                {
+                    typ = typed_expr.typ;
+                    node = Texpr_let ((name, typed_binding), typed_expr);
+                }
     )
 
-    | _ -> raise (Error ((Location.dummy, Location.dummy), "not yet implemented"))
+    | Ast.Pexpr_apply (name, args) -> (
+        match Hashtbl.find_opt global_env name.node with
+        | None -> raise (Error (name.range, "function '" ^ name.node ^ "' not found"))
+        | Some (decl) ->
+            let typed_args = List.map (fun a -> expr global_env state a) args in
+            let args_type = List.map (fun a -> a.typ) typed_args in
+            let v = Ttyp_var (V.create ()) in
+            unify decl.typ (Ttyp_function (args_type, v));
+            {
+                typ = v;
+                node = Texpr_apply (name, typed_args)
+            }
+    )
+
+    | _ -> raise (Error (e.range, "not yet implemented"))
 
 let rec find_functions functions decls =
     let handle_decl decl = match decl with
@@ -265,47 +318,19 @@ let compress_function functions name =
     )
 
 let file decls =
+    let global_env = Hashtbl.create 17 in
     let functions = find_functions (Hashtbl.create 31) decls in
     let functions_name = List.of_seq (SSet.to_seq (SSet.of_seq (Hashtbl.to_seq_keys functions))) in
     let compressed_functions = List.map (fun name -> compress_function functions name) functions_name in
-    ()
-
-let rec head = function
-    | Ttyp_var { def = Some t } -> head t
-    | t -> t
-
-(* 
-let rec canon t = match head t with
-    | Ttyp_unit | Ttyp_boolean | Ttyp_int | Ttyp_string as t -> t
-    | Ttyp_effect t -> Ttyp_effect (canon t)
-    | Ttyp_var tv -> Ttyp_var ({ id = tv.id; def = canon (head tv.def) })
-*)
-
-
-let rec occur v t = match head t with
-    | Ttyp_var w -> V.equal v w
-    | _ -> false
-
-
-exception UnificationFailure of Typedtree.typ * Typedtree.typ
-let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
-
-let rec unify t1 t2 = match head t1, head t2 with
-    | Ttyp_int, Ttyp_int 
-    | Ttyp_boolean, Ttyp_boolean 
-    | Ttyp_string, Ttyp_string
-    | Ttyp_unit, Ttyp_unit -> ()
-    | Ttyp_var v1, Ttyp_var v2 when V.equal v1 v2 -> ()
-    | (Ttyp_var v1 as t1), t2 -> if occur v1 t2 then unification_error t1 t2;
-                                 assert (v1.def = None);
-                                v1.def <- Some t2
-    | t1, (Ttyp_var v2 as t2) -> unify t2 t1
-    | Ttyp_function (pl1, e1), Ttyp_function (pl2, e2) -> unify_params pl1 pl2;
-                                                                  unify e1 e2
-    | _ -> ()
-
-and unify_params p1 p2 = match (p1, p2) with
-    | [], [] -> ()
-    | t1::r1, t2::r2 -> unify t1 t2; unify_params r1 r2
-    | [], _ 
-    | _, [] -> raise (Error ((Location.dummy, Location.dummy), "not the same number of parameters"))
+    List.iter (fun (signature, f) -> (
+        match f with
+        | Pdecl_func (name, params, e) -> (
+            let typed_body = expr global_env SMap.empty e in
+            Hashtbl.add global_env name.node 
+                {
+                    typ = Ttyp_function ([], effect_unit);
+                    node = (Tdecl_function (name, [], typed_body));
+                };
+        )
+        | _ -> assert false
+    )) compressed_functions
