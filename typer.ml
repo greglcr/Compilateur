@@ -6,6 +6,8 @@ exception Error of (Location.t * Location.t) * string
 module SMap = Map.Make(String)
 module SSet = Set.Make(String)
 
+let dummy_range = Location.dummy, Location.dummy
+
 (*
 There many simplications over the real PureScript about the typing:
   - There no type inference for functions signature. That is, a function
@@ -70,82 +72,58 @@ let dummy_ident =
         any source or user typed identifier. *)
     fill_with_dummy_range "$"
 
+let type_of_constant c = match c with
+    | Ast.Cbool _ -> Ttyp_boolean
+    | Ast.Cint _ -> Ttyp_int
+    | Ast.Cstring _ -> Ttyp_string
+
 let effect_unit = Ttyp_effect (Ttyp_unit)
-let check_if_unit expr =
-    if expr.typ <> effect_unit then
-        raise (Error ((Location.dummy, Location.dummy), "expected Effect Unit type"))
-
-let check_if_int expr =
-    if expr.typ <> Ttyp_int then
-        raise (Error ((Location.dummy, Location.dummy), "expected Int type"))
-
-let check_if_string expr =
-    if expr.typ <> Ttyp_string then
-        raise (Error ((Location.dummy, Location.dummy), "expected String type"))
-
-let check_if_boolean expr =
-    if expr.typ <> Ttyp_boolean then
-        raise (Error ((Location.dummy, Location.dummy), "expected Boolean type"))
 
 let check_if_has_eq expr =
     if (expr.typ <> Ttyp_boolean) || (expr.typ <> Ttyp_int) || (expr.typ <> Ttyp_string) then
         raise (Error ((Location.dummy, Location.dummy), "expected Boolean, Int or String type"))
 
-let rec expr global_env state e = match e.node with
-    | Ast.Pexpr_constant c -> (
-        let t = match c with
-            | Cbool _ -> Ttyp_boolean
-            | Cint _ -> Ttyp_int
-            | Cstring _ -> Ttyp_string
-        in
+let rec type_expr genv lenv e = match e.node with
+    | Ast.Pexpr_constant c ->
         {
-            typ = t;
+            typ = type_of_constant c;
             node = Texpr_constant c;
         }
-    )
 
-    | Ast.Pexpr_binary (op, lhs, rhs) -> (
-        let tlhs = expr global_env state lhs in
-        let trhs = expr global_env state rhs in
-
+    | Ast.Pexpr_binary (op, lhs, rhs) ->
+        let tlhs = type_expr genv lenv lhs in
+        let trhs = type_expr genv lenv rhs in
         let t = match op.node with
-            | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv -> (
+            | Ast.Badd | Ast.Bsub | Ast.Bmul | Ast.Bdiv ->
                 unify tlhs.typ Ttyp_int;
                 unify trhs.typ Ttyp_int;
                 Ttyp_int
-            )
-            | Ast.Bconcat -> (
+            | Ast.Bconcat ->
                 unify tlhs.typ Ttyp_string;
                 unify trhs.typ Ttyp_string;
                 Ttyp_string
-            )
-            | Ast.Beq | Ast.Bneq -> (
+            | Ast.Beq | Ast.Bneq ->
                 check_if_has_eq tlhs;
                 check_if_has_eq trhs;
                 Ttyp_boolean
-            )
-            | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge -> (
+            | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge ->
                 unify tlhs.typ Ttyp_int;
                 unify trhs.typ Ttyp_int;
                 Ttyp_boolean
-            )
-            | Ast.Bor | Ast.Band -> (
+            | Ast.Bor | Ast.Band ->
                 unify tlhs.typ Ttyp_boolean;
                 unify trhs.typ Ttyp_boolean;
                 Ttyp_boolean
-            )
         in
-
         {
             typ = t;
             node = Texpr_binary (op.node, tlhs, trhs);
         }
-    )
 
-    | Ast.Pexpr_if (cond, then_, else_) -> (
-        let tcond = expr global_env state cond in
-        let tthen = expr global_env state then_ in
-        let telse = expr global_env state else_ in
+    | Ast.Pexpr_if (cond, then_, else_) ->
+        let tcond = type_expr genv lenv cond in
+        let tthen = type_expr genv lenv then_ in
+        let telse = type_expr genv lenv else_ in
 
         unify tcond.typ Ttyp_boolean;
 
@@ -157,51 +135,87 @@ let rec expr global_env state e = match e.node with
             typ = tthen.typ;
             node = Texpr_if (tcond, tthen, telse);
         }
-    )
 
-    | Ast.Pexpr_do exprs -> (
-        let texprs = List.map (fun (e : Ast.expr) -> expr global_env state e) exprs in
+    | Ast.Pexpr_do exprs ->
+        let texprs = List.map (fun (e : Ast.expr) -> type_expr genv lenv e) exprs in
         List.iter (fun t -> unify t.typ effect_unit) texprs;
-
         {
             typ = Ttyp_unit;
             node = Texpr_do texprs;
         }
-    )
 
-    | Ast.Pexpr_let (bindings, e) -> (
+    | Ast.Pexpr_let (bindings, e) -> 
         match bindings with
-            | [] -> expr global_env state e
+            | [] -> type_expr genv lenv e
             | (name, value) :: r -> 
-                let typed_binding = expr global_env state value in
-                let typed_expr = expr global_env
-                    (SMap.add name.node typed_binding.typ state)
+                let tbinding = type_expr genv lenv value in
+                let texpr = type_expr genv
+                    (SMap.add name.node tbinding.typ lenv)
                     {
                         range = e.range;
                         node = (Ast.Pexpr_let (r, e));
                     }
                 in
                 {
-                    typ = typed_expr.typ;
-                    node = Texpr_let ((name, typed_binding), typed_expr);
+                    typ = texpr.typ;
+                    node = Texpr_let ((name, tbinding), texpr);
                 }
-    )
 
-    | Ast.Pexpr_apply (name, args) -> (
-        match Hashtbl.find_opt global_env name.node with
+    | Ast.Pexpr_apply (name, args) ->
+        match Hashtbl.find_opt genv.items name.node with
         | None -> raise (Error (name.range, "function '" ^ name.node ^ "' not found"))
         | Some (decl) ->
-            let typed_args = List.map (fun a -> expr global_env state a) args in
-            let args_type = List.map (fun a -> a.typ) typed_args in
+            let targs = List.map (fun a -> type_expr genv lenv a) args in
+            let args_type = List.map (fun a -> a.typ) targs in
             let v = Ttyp_variable (V.create ()) in
             unify decl.typ (Ttyp_function (args_type, v));
             {
                 typ = v;
-                node = Texpr_apply (name, typed_args)
+                node = Texpr_apply (name, targs)
             }
-    )
 
     | _ -> raise (Error (e.range, "not yet implemented"))
+
+let check_arity args expected_arity =
+    (List.compare_length_with args expected_arity) = 0
+
+let type_pattern genv lenv pattern = match pattern.node with
+    | Ast.Ppattern_constant c ->
+        type_of_constant c
+
+    | Ast.Ppattern_variable name -> 
+        let typ = Ttyp_variable (V.create ()) in
+        {
+            typ;
+            node = Tpattern_variable (name);
+        }
+
+    | Ast.Ppattern_constructor (name, patterns) ->
+        match Hashtbl.find_opt genv.constructors name with
+        | Some (constructor) -> (
+            (* First, we check if we both the pattern arity and the
+               expected constructor arity are the same. *)
+            if not (check_arity patterns constructor.arity) then (
+                raise (Error (dummy_range, "mismatch arity"))
+            );
+
+            (* Then, we check if the patterns type match the
+               constructor expected arguments type. *)
+            let tpatterns = List.map (fun p -> 
+                type_pattern genv lenv pattern
+            ) patterns in
+            List.iter2 (fun tpattern expected_type ->
+                unify tpattern.typ expected_type
+            ) tpatterns constructor.args;
+            
+            {
+                typ = constructor.decl.typ;
+                node = Tpattern_constructor (name, tpatterns);
+            }
+        )
+
+        | None -> 
+            raise (Error (dummy_range, "unknown constructor"))
 
 (* Find the declaration and all equations corresponding to the given 
    function name as a couple decl * decl list. 
@@ -247,15 +261,98 @@ let rec find_function (fname : string) (decls : decl list) =
         Option.get decl, equations
     )
 
-let check_function_equation decl expected_arity (name, args, body) =
-    (* We start to check if the equation's arity is the same
-       as the function declaration arity. *)
-    if (List.compare_length_with args expected_arity) = 0 then (
+let is_non_variable_pattern = function
+    | Ppattern_variable _ -> false
+    | _ -> true
+    
+(* Check if a function's equation is valid. *)
+let type_function_equation genv lenv decl (expected_arity, expected_args_type, expected_ret_type) (name, patterns, body) =
+    (* We start to check if the equation's arity is the same as 
+       the expected arity. *)
+    if (List.compare_length_with patterns expected_arity) = 0 then (
         raise (Error (decl.range, "arity mismatch"))
     );
 
-    List.map2
+    (* Then, we check if each pattern is correctly typed. *)
+    let typed_patterns = List.map2 (fun pattern expected_type -> (
+        let typed_pattern = type_pattern genv lenv pattern
+        in unify typed_pattern.typ expected_type;
+        typed_pattern
+    )) patterns expected_args_type in
+
+    (* TODO:
+        (* We also check that there is at most one non-variable pattern
+        and it is at the same position as the other non-variables patterns
+        in the other equations. *)
+        List.iteri (fun i pattern -> (
+        if is_non_variable_pattern pattern & i <> non_variable_index then
+                raise (Error (pattern.range, "non variable pattern"))
+        )) patterns
+    *)
+
+let type_function genv lenv ((decl : Ast.decl), (equations : Ast.decl list)) =
+    let expected_args_type, expected_ret_type = match decl with
+        | Pdecl_function (_, _, args_type, ret_type, _) ->
+            List.map from_ast_type args_type, from_ast_type ret_type
+        | _ -> assert false
+    in
+    (* Check if all function's equations are correctly typed. *)
+    let typed_equations = List.map (fun eq -> 
+        type_function_equation genv lenv decl
+    ) equations
+    in
+    (* And if yes, compress all of them into a single function expression. 
+       In other words, if we have
+            f p1 = e1
+            f p2 = e2
+            ...
+            f pn = en
+       with p1, ..., pn n patterns and e1, ..., en n expressions.
+       Then we transform that into the following equivalent code:
+            f x =
+                case x of
+                    p1 -> e1
+                    p2 -> e2
+                    ...
+                    pn -> en *)
+    ()
+
+let type_data decl = match decl with
+    | Pdecl_data (name, args, fields) -> (
+       let link_typs = Hashtbl.create 17 in
+       List.iter 
+    )
+
+    | _ -> assert false
 
 let file decls =
-    let global_env = Hashtbl.create 17 in
-    ()
+    let genv = { items = Hashtbl.create 17 } in  
+    List.iter (fun decl -> (
+        match decl with
+            | Pdecl_data (name, args, fields) ->
+                type_data decl
+
+            | _ -> ()
+    )) decls
+
+(* Returns a type (of the typed tree) corresponding to the given
+   function declaration. *)
+let type_from_function_decl genv (decl : Ast.decl) =
+    let lenv = Hashtbl.create 17 in
+    match decl.node with
+    | Pdecl_function (_, vars, _, args_typ, return_typ) -> (
+        List.iter (fun x -> Hashtbl.add x (V.create ())) vars;
+        let link_type_param l = match l with
+            | [] -> []
+            | tp :: r -> try (Hashtbl.find lenv tp) :: (link_type_param r)
+                         with Not_found -> (try (Hashtbl.find genv tp) :: (link_type_param r) 
+                                            with Not_found -> raise (Error (Location.dummy, Location.dummy), "Type inconnu")) in
+        Ttyp_function ((link_type_param args_typ),
+                        try (Hashtbl.find lenv return_typ)
+                        with Not_found -> (try (Hashtbl.find genv tp) 
+                                           with Not_found -> raise (Error (Location.dummy, Location.dummy), "Type inconnu"))
+        
+                      )
+    )                      
+
+    | _ -> assert false

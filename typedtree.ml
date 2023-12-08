@@ -84,3 +84,12 @@ and pattern_kind =
 
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
+
+type item = 
+    {
+        (* The parent data declaration of this constructor. *)
+        decl : decl;
+        (* Its arguments *)
+        args : typ list;
+        arity : int;
+    }

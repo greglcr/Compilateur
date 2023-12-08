@@ -22,7 +22,7 @@ and decl_kind =
         * (pattern list) (* arguments *)
         * expr (* function body *)
     (* a function declaration *)
-    | Pdecl_function of 
+    | Pdecl_function of
         ident (* function name *)
         * (ident list) (* quantified variables *)
         * (typ list) (* class types (constraints) *)
