@@ -8,35 +8,52 @@ type 'a located_node =
         node : 'a;
     }
 
-type file = decl list
+(* a MiniPureScript program *)
+type program = decl list
 
+(* an identifier with source code location data *)
 and ident = string located_node
 
-and decl = decl_node located_node
-and decl_node =
-    (* Function declaration 
-       <lident> <partag>* = expr *)
-    | Pdecl_func of ident * (pattern list) * expr
-    (* Function signature 
-       <lident> :: (forall <lident>+ .)? (<ntype> =>)* (<type> ->)* <type> *)
-    | Pdecl_func_signature of ident * (ident list) * (typ list) * (typ list) * typ
-    (* Data declaration
-       data <uident> <lident>* = (<uident> <atype>* )+ *)
-    | Pdecl_data of ident * (ident list) * (typ list) 
-    (* Class declaration
-       class <uident> <lident>* where { <tdecl>*; } *)
-    | Pdecl_class of ident * (ident list) * (decl list) 
-    (* Instance declaration
-       instance <instance> where { <defn>*; } *)
-    | Pdecl_instance of instance * (decl list)
+and decl = decl_kind located_node
+and decl_kind =
+    (* a function declaration *)
+    | Pdecl_func of 
+        ident (* function name *)
+        * (pattern list) (* arguments *)
+        * expr (* function body *)
+    (* a function signature *)
+    | Pdecl_func_signature of 
+        ident (* function name *)
+        * (ident list) (* quantified variables *)
+        * (typ list) (* class types (constraints) *)
+        * (typ list) (* arguments type *)
+        * typ (* return type *)
+    (* a data declaration *)
+    | Pdecl_data of 
+        ident (* data name *)
+        * (ident list) (* arguments *)
+        * (typ list) (* fields *)
+    (* a class declaration *)
+    | Pdecl_class of 
+        ident (* class name *)
+        * (ident list) (* arguments *)
+        * (decl list) (* class's declarations (fields) *)
+    (* an instance declaration *)
+    | Pdecl_instance of 
+        instance (* instance's target *)
+        * (decl list) (* instance's declarations (fields) *)
 
-and typ = typ_node located_node
-and typ_node =
+and typ = typ_kind located_node
+and typ_kind =
+    (* a variable type (in lowercase) *)
     | Ptyp_variable of string
-    | Ptyp_apply of ident * typ list
+    (* a data type with the name and its arguments *)
+    | Ptyp_data of ident * typ list
 
 (* <ntype> OR (<ntype>+) => <ntype> *)
-and instance = typ list * typ option
+and instance = 
+    typ list (* instance's dependencies, if any *)
+    * typ (* instance's target *)
 
 and constant =
     (* e.g. true or false *)
@@ -46,40 +63,38 @@ and constant =
     (* e.g. "foo bar" *)
     | Cstring of string
 
-(* Some notes:
-   - A variable reference, e.g. "foo", is represented as function call without
-     any argument.
-   - A module or constructor call is the same as an function call.
-*)
-and expr = expr_node located_node
-and expr_node =
-    (* <constant> *)
+and expr = expr_kind located_node
+and expr_kind =
+    (* constant *)
     | Pexpr_constant of constant
-    (* <expr> <op> <expr> *)
+    (* binary operator, lhs, rhs *)
     | Pexpr_binary of binop located_node * expr * expr
-    (* - <expr> *)
+    (* sub expression, arithmetic negation *)
     | Pexpr_neg of expr
+    (* variable name *)
+    | Pexpr_variable of string
+    (* function name, arguments *)
     | Pexpr_apply of ident * expr list
-    (* if e1 then e2 else e3 *)
+    (* condition expression, then expression, else expression *)
     | Pexpr_if of expr * expr * expr
-    (* do <exprs> *)
+    (* block of multiple expressions *)
     | Pexpr_do of expr list
-    (* let <bindings> in <expr> *)
+    (* let bindings in expression *)
     | Pexpr_let of binding list * expr
-    (* case <expr> of <branchs> *)
+    (* condition expression, the patterns *)
     | Pexpr_case of expr * branch list
 
 (* <lident> = <expr> *)
 and binding = ident * expr
 
-and pattern = pattern_node located_node
-and pattern_node =
-    (* e.g. 42 *)
+and pattern = pattern_kind located_node
+and pattern_kind =
+    (* constant *)
     | Ppattern_constant of constant
-    (* e.g. foo *)
+    (* variable name *)
     | Ppattern_variable of string
-    (* e.g. Bar 42 *)
-    | Ppattern_apply of ident * pattern list
+    (* constructor name, arguments to constructor *)
+    | Ppattern_constructor of ident * pattern list
 
 (* <pattern> -> <expr> *)
 and branch = pattern * expr

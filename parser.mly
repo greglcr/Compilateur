@@ -5,7 +5,7 @@
 
     module Imports = Set.Make(String)
 
-    let create_lexeme_node (s, e) node =
+    let mk_node (s, e) node =
         {
             range = (Location.from_lexing_position s, Location.from_lexing_position e);
             node
@@ -69,10 +69,15 @@ file:
         }
 ;
 
+(* For our limited implementation of MiniPureScript, we don't support imports.
+   However, we expect programs to contain some required imports to be compilable
+   by the reference implementation of PureScript. To check if these imports
+   exist, we accumulate all imports into a set (we don't check duplicates because,
+   in PureScript, they are allowed). Then, we check if the import set contains
+   the required imports. *)
 imports:
     | IMPORT name = UIDENT SEMI
         {
-            (* For PureScript, duplicating imports is not an error. *)
             Imports.singleton name
         }
 
@@ -89,11 +94,11 @@ decl:
     | td = tdecl
         { td }
 
-    | d = decl_internal
-        { create_lexeme_node $loc(d) d }
+    | d = decl_kind
+        { mk_node $loc d }
 ;
 
-decl_internal:
+decl_kind:
     | DATA name = uident lli = lident* EQ nt = separated_nonempty_list(PIPE, typ)
          { Pdecl_data (name, lli, nt) }
 
@@ -101,12 +106,12 @@ decl_internal:
         { Pdecl_class (name, lli, ltde) }
 
     | INSTANCE i = instance WHERE LBRACE ld = separated_list(SEMI, defn) RBRACE
-         { Pdecl_instance (i, ld) }
+        { Pdecl_instance (i, ld) }
 ;
 
 defn:
     | name = LIDENT p = patarg* EQ e = expr
-        { create_lexeme_node ($startpos(name), $endpos(e)) (Pdecl_func (create_lexeme_node $loc(name) name, p, e)) }
+        { mk_node $loc (Pdecl_func (mk_node $loc(name) name, p, e)) }
 ;
 
 tdecl:
@@ -115,7 +120,7 @@ tdecl:
         {
             let rev_typs = List.rev typs in
             let last_typ = List.hd (List.rev typs) in
-            create_lexeme_node ($startpos(name), $endpos(typs)) (Pdecl_func_signature 
+            mk_node $loc (Pdecl_func_signature 
                 (name, gen_vars, [], List.rev (List.tl rev_typs), last_typ))
         }
 ;
@@ -130,11 +135,10 @@ forall:
 
 atype:
     | name = LIDENT
-        { create_lexeme_node $loc(name) (Ptyp_variable (name)) }
+        { mk_node $loc (Ptyp_variable (name)) }
 
     | name = UIDENT
-        { create_lexeme_node $loc(name)
-            (Ptyp_apply (create_lexeme_node $loc(name) name, [])) }
+        { mk_node $loc (Ptyp_data (mk_node $loc(name) name, [])) }
 
     | LPAR t = typ RPAR
         { t }
@@ -142,19 +146,15 @@ atype:
 
 ntype:
     | name = uident args = atype*
-        { create_lexeme_node 
-            ($startpos(name), $endpos(args))
-            (Ptyp_apply (name, args)) }
+        { mk_node $loc (Ptyp_data (name, args)) }
 ;
 
 typ:
     | name = LIDENT
-        { create_lexeme_node $loc(name) (Ptyp_variable (name)) }
+        { mk_node $loc (Ptyp_variable (name)) }
 
     | name = uident args = typ*
-        { create_lexeme_node 
-            ($startpos(name), $endpos(args))
-            (Ptyp_apply (name, args)) }
+        { mk_node $loc (Ptyp_data (name, args)) }
 
     | LPAR t = typ RPAR
         { t }
@@ -173,13 +173,13 @@ instance:
 
 patarg:
     | c = CST
-        { create_lexeme_node $loc(c) (Ppattern_constant (c)) }
+        { mk_node $loc (Ppattern_constant (c)) }
 
     | name = LIDENT
-        { create_lexeme_node $loc(name) (Ppattern_variable (name)) }
+        { mk_node $loc (Ppattern_variable (name)) }
 
     | name = UIDENT
-        { create_lexeme_node $loc(name) (Ppattern_apply (create_lexeme_node $loc(name) name, [])) }
+        { mk_node $loc (Ppattern_constructor (mk_node $loc(name) name, [])) }
 
     | LPAR p = pattern RPAR
         { p }
@@ -190,38 +190,32 @@ pattern:
         { p }
 
     | name = uident args = patarg+
-        { create_lexeme_node 
-            ($startpos(name), $endpos(args))
-            (Ppattern_apply (name, args)) }
-
-atom:
-    | a = atom_internal
-        { create_lexeme_node $loc(a) a }
+        { mk_node $loc (Ppattern_constructor (name, args)) }
 
 (* atom without location *)
-atom_internal:
+atom:
     | c = CST
-        { Pexpr_constant (c) }
+        { mk_node $loc (Pexpr_constant (c)) }
 
     | name = lident
-        { Pexpr_apply (name, []) }
+        { mk_node $loc (Pexpr_variable name) }
 
     | name = uident
-        { Pexpr_apply (name, []) }
+        { mk_node $loc (Pexpr_apply (name, [])) }
 
-    | LPAR e = expr_internal RPAR
+    | LPAR e = expr RPAR
         { e }
 ;
 
 expr:
-    | e = expr_internal
-        { create_lexeme_node $loc(e) e }
+    | a = atom
+        { a }
+    
+    | e = expr_kind
+        { mk_node $loc e }
 
 (* expr without location *)
-expr_internal:
-    | a = atom_internal
-        { a }
-
+expr_kind:
     | name = lident args = atom+
     | name = uident args = atom+
         { Pexpr_apply (name, args) }
@@ -230,7 +224,7 @@ expr_internal:
         { Pexpr_neg (e) }
 
     | lhs = expr op = binop rhs = expr
-        { Pexpr_binary (create_lexeme_node $loc(op) op, lhs, rhs) }
+        { Pexpr_binary (mk_node $loc(op) op, lhs, rhs) }
 
     | IF cond = expr THEN then_ = expr ELSE else_ = expr
         { Pexpr_if (cond, then_, else_) }
@@ -255,12 +249,12 @@ branch:
 
 lident:
     | ident = LIDENT
-        { create_lexeme_node $loc(ident) ident }
+        { mk_node $loc ident }
 ;
 
 uident:
     | ident = UIDENT
-        { create_lexeme_node $loc(ident) ident }
+        { mk_node $loc ident }
 ;
 
 %inline binop:
