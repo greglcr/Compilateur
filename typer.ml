@@ -191,7 +191,7 @@ let type_pattern genv lenv pattern = match pattern.node with
         }
 
     | Ast.Ppattern_constructor (name, patterns) ->
-        match Hashtbl.find_opt genv.constructors name with
+        match Hashtbl.find_opt genv.items name with
         | Some (constructor) -> (
             (* First, we check if we both the pattern arity and the
                expected constructor arity are the same. *)
@@ -263,6 +263,9 @@ let rec find_function (fname : string) (decls : decl list) =
 
 let is_non_variable_pattern = function
     | Ppattern_variable _ -> false
+    | Ppattern_variable _ -> false
+    | _ -> true
+    
     | _ -> true
     
 (* Check if a function's equation is valid. *)
@@ -278,7 +281,7 @@ let type_function_equation genv lenv decl (expected_arity, expected_args_type, e
         let typed_pattern = type_pattern genv lenv pattern
         in unify typed_pattern.typ expected_type;
         typed_pattern
-    )) patterns expected_args_type in
+    )) patterns expected_args_type in ()
 
     (* TODO:
         (* We also check that there is at most one non-variable pattern
@@ -301,7 +304,10 @@ let type_function genv lenv ((decl : Ast.decl), (equations : Ast.decl list)) =
         type_function_equation genv lenv decl
     ) equations
     in
-    (* And if yes, compress all of them into a single function expression. 
+    (* And if yes, compress all of them i
+    | Ppattern_variable _ -> false
+    | _ -> true
+    nto a single function expression. 
        In other words, if we have
             f p1 = e1
             f p2 = e2
@@ -317,16 +323,29 @@ let type_function genv lenv ((decl : Ast.decl), (equations : Ast.decl list)) =
                     pn -> en *)
     ()
 
-let type_data decl = match decl with
+
+let find_in_env genv locenv key = 
+    try Hashtbl.find genv key
+    with Not_found -> try Hashtbl.find locenv key
+                      with Not_found -> raise (Error (dummy_ident, "type not found"))
+(*Add Ttyp data in Ast?*)
+let type_data genv decl = match decl with
     | Pdecl_data (name, args, fields) -> (
-       let link_typs = Hashtbl.create 17 in
-       List.iter 
-    )
+        let loc_env = Hashtbl.create 17 in
+        let list_typ = ref [] in
+        List.iter (fun x -> let new_typ = Ttyp_variable (V.create()) in list_typ := new_typ :: (!list_typ); Hashtbl.add loc_env x args)
+        Hashtbl.add genv.items name (Tdecl_data (name, !list_typ));
+        (*We go through the list of fields in order to declare function that have the argument given and a return type of the data*)
+        let rec add_fields l = match l with
+            | [] -> ()
+            | (name_cons, args) :: r -> Hashtbl.add genv.func name_cons Ttyp_func ( (List.iter (fun x -> find_in_env genv locenv x) args) (find_in_env genv locenv name)) in(*We must return a Ttyp_func (typ list of all the argument given, typ return which is the data type declare just above) *)
+        add_fields fields
+    )   
 
     | _ -> assert false
 
-let file decls =
-    let genv = { items = Hashtbl.create 17 } in  
+let file decls = 
+    let genv = { items = Hashtbl.create 17 } in
     List.iter (fun decl -> (
         match decl with
             | Pdecl_data (name, args, fields) ->
