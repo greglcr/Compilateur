@@ -111,7 +111,7 @@ decl_kind:
 
 defn:
     | name = LIDENT p = patarg* EQ e = expr
-        { mk_node $loc (Pdecl_func (mk_node $loc(name) name, p, e)) }
+        { mk_node $loc (Pdecl_equation (mk_node $loc(name) name, p, e)) }
 ;
 
 tdecl:
@@ -120,7 +120,7 @@ tdecl:
         {
             let rev_typs = List.rev typs in
             let last_typ = List.hd (List.rev typs) in
-            mk_node $loc (Pdecl_func_signature 
+            mk_node $loc (Pdecl_function 
                 (name, gen_vars, [], List.rev (List.tl rev_typs), last_typ))
         }
 ;

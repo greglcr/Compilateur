@@ -16,13 +16,13 @@ and ident = string located_node
 
 and decl = decl_kind located_node
 and decl_kind =
-    (* a function declaration *)
-    | Pdecl_func of 
+    (* a function equation *)
+    | Pdecl_equation of 
         ident (* function name *)
         * (pattern list) (* arguments *)
         * expr (* function body *)
-    (* a function signature *)
-    | Pdecl_func_signature of 
+    (* a function declaration *)
+    | Pdecl_function of 
         ident (* function name *)
         * (ident list) (* quantified variables *)
         * (typ list) (* class types (constraints) *)

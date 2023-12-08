@@ -27,7 +27,7 @@ type typ =
     | Ttyp_int
     | Ttyp_string
     | Ttyp_effect of typ
-    | Ttyp_var of tvar
+    | Ttyp_variable of tvar
     | Ttyp_function of typ list * typ
 
 and tvar = 
@@ -36,26 +36,32 @@ and tvar =
         mutable def : typ option;
     }
 
-and 'a typed_node = 
+and 'a 'b typed_node = 
     {
         (* The type of the tree node. *)
         typ : typ;
+        (* The corresponding node in the AST if any.
+           Because, when constructing the typed tree some syntax is desugared,
+           some nodes may be created without a corresponding AST node. *)
+        ast : 'a option;
         (* The underlying node. *)
-        node : 'a;
+        node : 'b;
     }
 
-and decl = decl_node typed_node
-and decl_node =
+and decl = decl_kind typed_node
+and decl_kind =
     | Tdecl_function of Ast.ident * param list * expr
 
-and param = string typed_node
+(* a function parameter *)
+and param = string * typ
 
-and expr = expr_node typed_node
-and expr_node =
+and expr = expr_kind typed_node
+and expr_kind =
     (* A constant, like an integer, a boolean or a string. *)
     | Texpr_constant of Ast.constant
     (* <expr> <op> <expr> *)
     | Texpr_binary of Ast.binop * expr * expr
+    | Texpr_variable of string
     (* <name> OR <name> <exprs> 
        This also include variable references. *)
     | Texpr_apply of Ast.ident * (expr list)
@@ -71,14 +77,14 @@ and expr_node =
 (* <lident> = <expr> *)
 and binding = Ast.ident * expr
 
-and pattern = pattern_node typed_node
-and pattern_node =
+and pattern = pattern_kind typed_node
+and pattern_kind =
     (* e.g. 42 *)
     | Tpattern_constant of Ast.constant
     (* e.g. foo *)
     | Tpattern_variable of string
     (* e.g. Bar 42 *)
-    | Tpattern_apply of string * pattern list
+    | Tpattern_constructor of string * pattern list
 
 (* <pattern> -> <expr> *)
 and branch = pattern * expr

@@ -317,6 +317,60 @@ let compress_function functions name =
         (Option.get !signature), (Option.get !has_simple_declaration)
     )
 
+(* Find the declaration and all equations corresponding to the given 
+   function name as a couple decl * decl list. 
+   
+   If no declaration is found for the function or if there is multiple
+   declarations for the same function, then an error is emitted at
+   the location either of the last declaration or the first function
+   equation. *)
+let rec find_function (fname : string) (decls : decl list) =
+    let range_to_use = ref (Location.dummy, Location.dummy) in
+    let rec loop function_decl equations decls = match decls with
+        | [] -> function_decl, equations
+        | decl :: r -> (
+            match decl.node with
+                (* A function equation, just store it and continue the scanning. *)
+                | Pdecl_equation (name, _, _) when name = fname -> (
+                    range_to_use := decl.range;
+                    loop function_decl (decl :: equations) r
+                )
+
+                (* A function declaration. We need to check if there is no multiple
+                   declarations for the same function as it is an error. *)
+                | Pdecl_function (name, _, _, _, _) when name = fname -> (
+                    if Option.is_some function_decl then (
+                        (* The function has multiple declarations which is not allowed. *)
+                        raise (Error (decl.range, "function '" ^ fname ^ "' declared multiple times"))
+                    ) else (
+                        loop (Some decl) equations r
+                    )
+                )
+
+                (* Either not a function with the same name or not a function at all.
+                   We just ignore it and continue our scanning. *)
+                | _ -> loop function_decl equations r
+            )
+    in
+    let decl, equations = loop None [] decls in
+    
+    (* Check if the function has a at least one declaration specified. *)
+    if Option.is_none decl then (
+        raise (Error (!range_to_use, "no function declaration for '" ^ fname ^ "'"))
+    ) else (
+        Option.get decl, equations
+    )
+
+let check_function_equation decl expected_arity (name, args, body) =
+    (* We start to check if the equation's arity is the same
+       as the function declaration arity. *)
+    let equation_arity = List.length args in
+    if (List.compare_lengths_with args expected_arity) = 0 then (
+        raise (Error (decl.range, "arity mismatch"))
+    );
+
+    List.map2
+
 let file decls =
     let global_env = Hashtbl.create 17 in
     let functions = find_functions (Hashtbl.create 31) decls in
