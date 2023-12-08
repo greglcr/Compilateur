@@ -36,16 +36,12 @@ and tvar =
         mutable def : typ option;
     }
 
-and 'a 'b typed_node = 
+and 'a typed_node = 
     {
         (* The type of the tree node. *)
         typ : typ;
-        (* The corresponding node in the AST if any.
-           Because, when constructing the typed tree some syntax is desugared,
-           some nodes may be created without a corresponding AST node. *)
-        ast : 'a option;
         (* The underlying node. *)
-        node : 'b;
+        node : 'a;
     }
 
 and decl = decl_kind typed_node

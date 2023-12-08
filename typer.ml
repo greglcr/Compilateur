@@ -22,11 +22,11 @@ module V = struct
 end
 
 let rec head = function
-    | Ttyp_var { def = Some t } -> head t
+    | Ttyp_variable { def = Some t } -> head t
     | t -> t
 
 let rec occur v t = match head t with
-    | Ttyp_var w -> V.equal v w
+    | Ttyp_variable w -> V.equal v w
     | _ -> false
     exception UnificationFailure of Typedtree.typ * Typedtree.typ
     let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
@@ -36,12 +36,12 @@ let rec unify t1 t2 = match head t1, head t2 with
     | Ttyp_boolean, Ttyp_boolean 
     | Ttyp_string, Ttyp_string
     | Ttyp_unit, Ttyp_unit -> ()
-    | Ttyp_var v1, Ttyp_var v2 when V.equal v1 v2 -> ()
-    | (Ttyp_var v1 as t1), t2 -> 
+    | Ttyp_variable v1, Ttyp_variable v2 when V.equal v1 v2 -> ()
+    | (Ttyp_variable v1 as t1), t2 -> 
         if occur v1 t2 then unification_error t1 t2;
         assert (v1.def = None);
         v1.def <- Some t2
-    | t1, (Ttyp_var v2 as t2) -> unify t2 t1
+    | t1, (Ttyp_variable v2 as t2) -> unify t2 t1
     | Ttyp_function (pl1, e1), Ttyp_function (pl2, e2) -> 
         unify_params pl1 pl2;
         unify e1 e2
@@ -193,7 +193,7 @@ let rec expr global_env state e = match e.node with
         | Some (decl) ->
             let typed_args = List.map (fun a -> expr global_env state a) args in
             let args_type = List.map (fun a -> a.typ) typed_args in
-            let v = Ttyp_var (V.create ()) in
+            let v = Ttyp_variable (V.create ()) in
             unify decl.typ (Ttyp_function (args_type, v));
             {
                 typ = v;
@@ -202,120 +202,6 @@ let rec expr global_env state e = match e.node with
     )
 
     | _ -> raise (Error (e.range, "not yet implemented"))
-
-let rec find_functions functions decls =
-    let handle_decl decl = match decl with
-        | Pdecl_func (name, patterns, expr) -> (
-            Hashtbl.add functions name.node decl
-        )
-        | Pdecl_func_signature (name, _, _, _, _) -> (
-        Hashtbl.add functions name.node decl
-        )
-        | _ -> ()
-    in match decls with
-    | [] -> functions
-    | decl::remaining -> (handle_decl decl.node); find_functions  functions remaining
-
-let compress_function functions name =
-    let all_declarations = Hashtbl.find_all functions name in
-
-    (*
-        We want to "compress" function declarations. That is, we want to merge
-        multiple declarations of the same function into a single one. For that,
-        we apply the following transformation :
-        If we have the following declarations (f the function name; p1, p2...
-        patterns; e1, e2... expressions) :
-
-            f p1 = e1
-            f p2 = e2
-            ...
-            f pn = en
-
-        Then we "compress" it to the single declaration :
-
-            f x =
-                case x of
-                    p1 -> e1
-                    p2 -> e2
-                    ...
-                    pn -> en
-
-        However, if there is one declaration with more than one pattern (more
-        than a single argument), then we fail (this is because we do not support
-        `case' with multiple patterns).
-        So, for example :
-
-            f a b = e1
-            f c d = e2
-
-        with a, b, c and d patterns; will fail.
-        One exception is if all patterns are only variables. As this does not
-        require pattern matching (it is just a classical function with arguments).
-
-        Finally, if there are two declarations with a different count of patterns,
-        then an error is emitted.
-    *)
-
-    let is_variable_pattern pattern = match pattern.node with
-        | Ppattern_variable _ -> true
-        | _ -> false
-    in
-
-    (* Accumulated patterns of all declarations *)
-    let signature = ref None in
-    let function_fully_declared = ref false in
-    let has_simple_declaration = ref None in
-    let last_declaration_name_range = ref None in
-    
-    let patterns = List.fold_left (fun previous_patterns decl -> match decl with
-        | Pdecl_func ({ range }, patterns, expr) -> (
-            if !function_fully_declared then (
-                let range = Option.get !last_declaration_name_range in
-                raise (Error (range, "function '" ^ name ^ "' already declared"))
-            ) else (
-                last_declaration_name_range := Some range;
-            );
-
-            let all_patterns_are_variables = List.for_all is_variable_pattern patterns in
-            let patterns_length = List.length patterns in
-            if all_patterns_are_variables || patterns_length == 0 then (
-                function_fully_declared := true;
-                has_simple_declaration := Some decl;
-                []
-            ) else if patterns_length == 1 then (
-                has_simple_declaration := None;
-                (List.hd patterns, expr) :: previous_patterns
-            ) else (
-                raise (Error (range, "too many patterns in '" ^ name ^ "' function declaration for "))
-            )
-        )
-
-        | Pdecl_func_signature ({ range }, _, _, _, _) -> (
-            if Option.is_some !signature then (
-                raise (Error (range, "function signature specified more than once for '" ^ name ^ "'"))
-            );
-
-            signature := Some decl;
-            []
-        )
-
-        | _ -> assert false
-    ) [] all_declarations
-    in
-
-    if Option.is_none !signature then (
-        raise (Error (Option.get !last_declaration_name_range, "function " ^ name ^ " has no signature"))
-    );
-
-    if Option.is_none !has_simple_declaration then (
-        let case_expr = Pexpr_case (
-            fill_with_dummy_range (Pexpr_apply (dummy_ident, [])),
-            patterns
-        ) in
-        (Option.get !signature), (Pdecl_func (fill_with_dummy_range name, [ fill_with_dummy_range (Ppattern_variable "$") ], fill_with_dummy_range case_expr))
-    ) else (
-        (Option.get !signature), (Option.get !has_simple_declaration)
-    )
 
 (* Find the declaration and all equations corresponding to the given 
    function name as a couple decl * decl list. 
@@ -331,14 +217,14 @@ let rec find_function (fname : string) (decls : decl list) =
         | decl :: r -> (
             match decl.node with
                 (* A function equation, just store it and continue the scanning. *)
-                | Pdecl_equation (name, _, _) when name = fname -> (
+                | Pdecl_equation (name, _, _) when name.node = fname -> (
                     range_to_use := decl.range;
                     loop function_decl (decl :: equations) r
                 )
 
                 (* A function declaration. We need to check if there is no multiple
                    declarations for the same function as it is an error. *)
-                | Pdecl_function (name, _, _, _, _) when name = fname -> (
+                | Pdecl_function (name, _, _, _, _) when name.node = fname -> (
                     if Option.is_some function_decl then (
                         (* The function has multiple declarations which is not allowed. *)
                         raise (Error (decl.range, "function '" ^ fname ^ "' declared multiple times"))
@@ -364,8 +250,7 @@ let rec find_function (fname : string) (decls : decl list) =
 let check_function_equation decl expected_arity (name, args, body) =
     (* We start to check if the equation's arity is the same
        as the function declaration arity. *)
-    let equation_arity = List.length args in
-    if (List.compare_lengths_with args expected_arity) = 0 then (
+    if (List.compare_length_with args expected_arity) = 0 then (
         raise (Error (decl.range, "arity mismatch"))
     );
 
@@ -373,18 +258,4 @@ let check_function_equation decl expected_arity (name, args, body) =
 
 let file decls =
     let global_env = Hashtbl.create 17 in
-    let functions = find_functions (Hashtbl.create 31) decls in
-    let functions_name = List.of_seq (SSet.to_seq (SSet.of_seq (Hashtbl.to_seq_keys functions))) in
-    let compressed_functions = List.map (fun name -> compress_function functions name) functions_name in
-    List.iter (fun (signature, f) -> (
-        match f with
-        | Pdecl_func (name, params, e) -> (
-            let typed_body = expr global_env SMap.empty e in
-            Hashtbl.add global_env name.node 
-                {
-                    typ = Ttyp_function ([], effect_unit);
-                    node = (Tdecl_function (name, [], typed_body));
-                };
-        )
-        | _ -> assert false
-    )) compressed_functions
+    ()

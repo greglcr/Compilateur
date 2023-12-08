@@ -72,7 +72,7 @@ and expr_kind =
     (* sub expression, arithmetic negation *)
     | Pexpr_neg of expr
     (* variable name *)
-    | Pexpr_variable of string
+    | Pexpr_variable of ident
     (* function name, arguments *)
     | Pexpr_apply of ident * expr list
     (* condition expression, then expression, else expression *)
@@ -92,7 +92,7 @@ and pattern_kind =
     (* constant *)
     | Ppattern_constant of constant
     (* variable name *)
-    | Ppattern_variable of string
+    | Ppattern_variable of ident
     (* constructor name, arguments to constructor *)
     | Ppattern_constructor of ident * pattern list
 

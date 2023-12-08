@@ -43,7 +43,7 @@
  donc seules celles là pourront être appelées en dehors de ce fichier.
 *)
 %start file
-%type <Ast.file> file
+%type <Ast.program> file
 
 %%
 
@@ -162,24 +162,24 @@ typ:
 
 instance:
     | nt = ntype
-        { [ nt ], None }
+        { [ ], nt }
 
     | nt1 = ntype FAT_ARROW nt2 = ntype
-        { ([nt1], Some nt2) }
+        { ([nt1], nt2) }
 
     | LPAR lnt = separated_nonempty_list(COMMA, ntype) RPAR FAT_ARROW nt = ntype
-        { (lnt, Some nt) }
+        { (lnt, nt) }
 ;
 
 patarg:
     | c = CST
         { mk_node $loc (Ppattern_constant (c)) }
 
-    | name = LIDENT
+    | name = lident
         { mk_node $loc (Ppattern_variable (name)) }
 
-    | name = UIDENT
-        { mk_node $loc (Ppattern_constructor (mk_node $loc(name) name, [])) }
+    | name = uident
+        { mk_node $loc (Ppattern_constructor (name, [])) }
 
     | LPAR p = pattern RPAR
         { p }
