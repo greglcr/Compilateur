@@ -239,20 +239,20 @@ expr_kind:
         { Pexpr_case (cond, lbranch) }
 ;
 
-binding:
+%inline binding:
     | name = lident EQ e = expr
         { (name, e) }
 
-branch:
+%inline branch:
     | p = pattern ARROW e = expr
         { (p, e) }
 
-lident:
+%inline lident:
     | ident = LIDENT
         { mk_node $loc ident }
 ;
 
-uident:
+%inline uident:
     | ident = UIDENT
         { mk_node $loc ident }
 ;
