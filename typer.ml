@@ -173,6 +173,9 @@ let rec type_expr genv lenv e = match e.node with
                 typ = v;
                 node = Texpr_apply (name, targs)
             }
+    
+    | Ast.Pexpr_neg (expr) ->
+        type_expr Ast.Pexr_binary ({ range : dummy_range; node = Ast.Bsub }, Pexpr_constant (Cint (0)), expr)
 
     | _ -> raise (Error (e.range, "not yet implemented"))
 
