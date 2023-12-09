@@ -34,6 +34,11 @@ let report (b,e) =
     let lc = e.pos_cnum - b.pos_bol + 1 in
     eprintf "File \"%s\", line %d, characters %d-%d:\n" file l fc lc
 
+let print_error (range_start, range_end) msg =
+    Location.print file range_start range_end;
+    eprintf "\x1b[1;31mError\x1b[0m: %s@." msg;
+    exit 1
+
 let show_tokens lb =
     let token = ref (Post_lexer.next_token lb) in
     while !token != EOF do
@@ -56,20 +61,14 @@ let () =
         )
     with
     | Lexing_error msg ->
-        let s = Location.lexeme_start lb in
-        let e = Location.lexeme_end lb in
-        Location.print file s e;
-        eprintf "\x1b[1;31merror:\x1b[0m %s@." msg;
-        exit 1
-    | Semantic_error ((range_start, range_end), s) ->
-        Location.print file range_start range_end;
-        eprintf "\x1b[1;31merror:\x1b[0m %s@." s;
-        exit 1
+        let range_start = Location.lexeme_start lb in
+        let range_end = Location.lexeme_end lb in
+        print_error (range_start, range_end) msg
+    | Semantic_error (range, msg) ->
+        print_error range msg
     | Parser.Error ->
-        report (lexeme_start_p lb, lexeme_end_p lb);
-        eprintf "\x1b[1;31merror:\x1b[0m syntax error@.";
-        exit 1
-    | Typer.Error ((range_start, range_end), s) ->
-        Location.print file range_start range_end;
-        eprintf "\x1b[1;31merror:\x1b[0m %s@." s;
-        exit 1
+        let range_start = Location.lexeme_start lb in
+        let range_end = Location.lexeme_end lb in
+        print_error (range_start range_end) "syntax error"
+    | Typer.Error (range, msg) ->
+        print_error range msg
