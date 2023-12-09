@@ -144,7 +144,7 @@ let rec type_expr genv lenv e = match e.node with
             node = Texpr_do texprs;
         }
 
-    | Ast.Pexpr_let (bindings, e) -> 
+    | Ast.Pexpr_let (bindings, e) -> (
         match bindings with
             | [] -> type_expr genv lenv e
             | (name, value) :: r -> 
@@ -160,8 +160,9 @@ let rec type_expr genv lenv e = match e.node with
                     typ = texpr.typ;
                     node = Texpr_let ((name, tbinding), texpr);
                 }
+    )
 
-    | Ast.Pexpr_apply (name, args) ->
+    | Ast.Pexpr_apply (name, args) -> (
         match Hashtbl.find_opt genv.items name.node with
         | None -> raise (Error (name.range, "function '" ^ name.node ^ "' not found"))
         | Some (decl) ->
@@ -173,9 +174,26 @@ let rec type_expr genv lenv e = match e.node with
                 typ = v;
                 node = Texpr_apply (name, targs)
             }
+    )
     
     | Ast.Pexpr_neg (expr) ->
-        type_expr Ast.Pexr_binary ({ range : dummy_range; node = Ast.Bsub }, Pexpr_constant (Cint (0)), expr)
+        (* We transform "-e" to the equivalent code "0 - e". *)
+        type_expr genv lenv {
+            range = e.range;
+            node = Ast.Pexpr_binary (
+                { (* The binary operator. As we do not preserve the unary '-'
+                     location in the AST, we can not "fake" the location of
+                     the binary '-' operator. *)
+                    range = dummy_range; 
+                    node = Ast.Bsub 
+                }, 
+                { (* The constant 0 does not exist in the source code.
+                     Therefore, there is no "source range" for it and so
+                     we just pass a dummy invalid range. *)
+                    range = dummy_range;
+                    node = Pexpr_constant (Cint (0))
+                }, expr);
+        }
 
     | _ -> raise (Error (e.range, "not yet implemented"))
 
