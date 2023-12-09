@@ -62,6 +62,8 @@ and constant =
     | Cint of int
     (* e.g. "foo bar" *)
     | Cstring of string
+    (* e.g. "unit" *)
+    | Cunit
 
 and expr = expr_kind located_node
 and expr_kind =

@@ -58,7 +58,7 @@ and expr_kind =
     | Texpr_constant of Ast.constant
     (* <expr> <op> <expr> *)
     | Texpr_binary of Ast.binop * expr * expr
-    | Texpr_variable of string
+    | Texpr_variable of Ast.ident
     (* <name> OR <name> <exprs> 
        This also include variable references. *)
     | Texpr_apply of Ast.ident * (expr list)
@@ -79,9 +79,9 @@ and pattern_kind =
     (* e.g. 42 *)
     | Tpattern_constant of Ast.constant
     (* e.g. foo *)
-    | Tpattern_variable of string
+    | Tpattern_variable of Ast.ident
     (* e.g. Bar 42 *)
-    | Tpattern_constructor of string * pattern list
+    | Tpattern_constructor of Ast.ident * pattern list
 
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
