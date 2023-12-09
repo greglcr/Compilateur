@@ -42,8 +42,8 @@ let rec head = function
 let rec occur v t = match head t with
     | Ttyp_variable w -> V.equal v w
     | _ -> false
-    exception UnificationFailure of Typedtree.typ * Typedtree.typ
-    let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
+exception UnificationFailure of Typedtree.typ * Typedtree.typ
+let unification_error t1 t2 = raise (UnificationFailure (t1, t2))
 
 let rec unify t1 t2 = match head t1, head t2 with
     | Ttyp_int, Ttyp_int
@@ -76,10 +76,7 @@ let fill_with_dummy_range node =
     {
         range = (Location.dummy, Location.dummy);
         node
-    }
-
-(* A dummy identifier used in generated code. *)
-let dummy_ident =
+    }typ list
     (* $ can not be typed by the user so this identifier is always different from
         any source or user typed identifier. *)
     fill_with_dummy_range "$"
@@ -94,9 +91,40 @@ let effect_unit = Ttyp_effect (Ttyp_unit)
 
 let make_node typ node = { typ; node }
 
-let make_sigma tvars =
+let make_sigma tvars args =
+    (*tvars = list of variable typ*)
+    let newTvars = Hashtbl.create 17 in
     let ht = Hashtbl.create 17 in
-    Hashtbl.iter (fun name _ -> Hashtbl.add ht name (Ttyp_variable (V.create ())))
+    Hashtbl.iter (
+                    fun name (Ttyp_variable(t)) -> 
+                        Hashtbl.add newTvars name (V.create());
+                        Hashtbl.add ht t.id name;
+                 ) 
+                 tvars;
+    let rec explore_type curTyp = match curTyp with
+        | Ttyp_unit
+        | Ttyp_boolean
+        | Ttyp_int
+        | Ttyp_string -> curTyp
+        | Ttyp_effect (nextTyp) -> Ttyp_effect(explore_type nextTyp)
+        | Ttyp_variable (nextTyp) -> 
+            (
+                match nextTyp.def with 
+                    | None -> 
+                        let name = Hashtbl.find ht nextTyp.id in
+                        Ttyp_variable(Hashtbl.find newTvars name)
+                (*Here it's necessary to add something to our final list*)
+                    | Some(t) ->
+                        let newV = V.create () in
+                        newV.def <- Some(explore_type t);
+                        Ttyp_variable (newV)
+            )
+        | _ -> assert false in
+    let newArgs = List.map explore_type args in
+    (newTvars, newArgs)
+
+
+
 
 let subst_sigma tvars typ = match typ with
     | Ttyp_variable (var) ->
@@ -176,7 +204,7 @@ let rec type_expr genv lenv e = match e.node with
         | None -> raise (Error (name.range, "function '" ^ name.node ^ "' not found"))
         | Some (decl) ->
             let targs = List.map (type_expr genv lenv) args in
-            let sigma = make_sigma decl.tvars in
+            let sigma = make_sigma decl.tvar inx
             let args_type = List.map (fun a -> subst_sigma sigma a.typ) targs in
             let v = Ttyp_variable (V.create ()) in
             unify decl.typ (Ttyp_function (args_type, v));
@@ -423,7 +451,8 @@ let type_class genv decl = match decl with
    *)
 
 let type_instances decl_inst genv loc_env = match inst with
-    | Pdecl_instance (instance (inst))
+    | Pdecl_instance (target, decls) -> let 
+    | _ -> assert false
 
 
 let file decls = 
