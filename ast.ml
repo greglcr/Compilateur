@@ -70,20 +70,22 @@ and expr_kind =
     (* constant *)
     | Pexpr_constant of constant
     (* binary operator, lhs, rhs *)
-    | Pexpr_binary of binop located_node * expr * expr
+    | Pexpr_binary of binop * expr * expr
     (* sub expression, arithmetic negation *)
     | Pexpr_neg of expr
     (* variable name *)
     | Pexpr_variable of ident
     (* function name, arguments *)
     | Pexpr_apply of ident * expr list
+    (* constructor name, arguments *)
+    | Pexpr_constructor of ident * expr list
     (* condition expression, then expression, else expression *)
     | Pexpr_if of expr * expr * expr
     (* block of multiple expressions *)
     | Pexpr_do of expr list
     (* let bindings in expression *)
     | Pexpr_let of binding list * expr
-    (* condition expression, the patterns *)
+    (* condition expression, the branches *)
     | Pexpr_case of expr * branch list
 
 (* <lident> = <expr> *)
@@ -101,7 +103,8 @@ and pattern_kind =
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
 
-and binop =
+and binop = binop_kind located_node
+and binop_kind =
     (* + - * / *)
     | Badd | Bsub | Bmul | Bdiv
     (* == /= < <= > >= *)
