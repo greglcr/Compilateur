@@ -47,6 +47,7 @@ and 'a typed_node =
 and decl = decl_kind typed_node
 and decl_kind =
     | Tdecl_function of Ast.ident * param list * expr
+    | Tdecl_data of Ast.ident * typ list
 
 (* a function parameter *)
 and param = string * typ

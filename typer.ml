@@ -332,7 +332,7 @@ let find_in_env genv locenv key =
     with Not_found -> try Hashtbl.find locenv key
                       with Not_found -> raise (Error (dummy_ident, "type not found"))
 (*Add Ttyp data in Ast?*)
-let type_data genv decl = match decl with
+let type_data genv lenv decl = match decl with
     | Pdecl_data (name, args, fields) -> (
         let loc_env = Hashtbl.create 17 in
         let list_typ = ref [] in
@@ -346,6 +346,39 @@ let type_data genv decl = match decl with
     )   
 
     | _ -> assert false
+
+
+let type_class genv decl = match decl with
+    | Pdecl_class (name, args, decls) -> 
+        let loc_env = Hashtbl.create 17 in
+        List.iter
+            (
+                fun x -> 
+                if Hashtbl.mem loc_env x || Hashtbl.mem genv x then raise (Error (dummy_range, "Redclaration of type"))
+                else Hashtbl.add lov_env x (V.create ()) (*Maybe we need to check if the type doesn't already exist, and if it the case raise a typing error*)
+            )
+            agrs;
+        List.iter
+            (
+                fun x ->
+                type_function genv loc_env x
+            )
+            decls;
+    | _ -> assert false
+
+
+(*When we define a calss C a1 .. an, we can use it in a instance with instance C Int.abs
+   An instance is either a ntype, either a ntype => ntype, either 
+   We can also have fatarrow in function declaration
+   When declaring an instance, when can add a list of nype like instance name ( ntype)
+   In purescript, instance can have names but it's never possible in minipurescript
+   We must also check that all general types declared are used.
+   Should we check that an instance declaration 
+   *)
+
+let type_instances decl_inst genv loc_env = match inst with
+    | Pdecl_instance (instance (inst))
+
 
 let file decls = 
     let genv = { items = Hashtbl.create 17 } in
