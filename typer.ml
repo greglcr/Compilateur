@@ -76,19 +76,18 @@ let type_of_constant c = match c with
     | Ast.Cbool _ -> Ttyp_boolean
     | Ast.Cint _ -> Ttyp_int
     | Ast.Cstring _ -> Ttyp_string
+    | Ast.Cunit -> Ttyp_unit
 
 let effect_unit = Ttyp_effect (Ttyp_unit)
 
-let check_if_has_eq expr =
-    if (expr.typ <> Ttyp_boolean) || (expr.typ <> Ttyp_int) || (expr.typ <> Ttyp_string) then
-        raise (Error ((Location.dummy, Location.dummy), "expected Boolean, Int or String type"))
+let make_node typ node = { typ; node }
+
+let is_equable_type typ =
+    let t = head typ in
+    t = Ttyp_boolean || t = Ttyp_int || t = Ttyp_string
 
 let rec type_expr genv lenv e = match e.node with
-    | Ast.Pexpr_constant c ->
-        {
-            typ = type_of_constant c;
-            node = Texpr_constant c;
-        }
+    | Ast.Pexpr_constant c -> make_node (type_of_constant c) (Texpr_constant c)
 
     | Ast.Pexpr_binary (op, lhs, rhs) ->
         let tlhs = type_expr genv lenv lhs in
@@ -103,9 +102,11 @@ let rec type_expr genv lenv e = match e.node with
                 unify trhs.typ Ttyp_string;
                 Ttyp_string
             | Ast.Beq | Ast.Bneq ->
-                check_if_has_eq tlhs;
-                check_if_has_eq trhs;
-                Ttyp_boolean
+                unify tlhs.typ trhs.typ;
+                if is_equable_type tlhs.typ then
+                    Ttyp_boolean
+                else
+                    raise (Error (lhs.range, "expected Boolean, Int or String type"))
             | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge ->
                 unify tlhs.typ Ttyp_int;
                 unify trhs.typ Ttyp_int;
@@ -114,52 +115,63 @@ let rec type_expr genv lenv e = match e.node with
                 unify tlhs.typ Ttyp_boolean;
                 unify trhs.typ Ttyp_boolean;
                 Ttyp_boolean
-        in
-        {
-            typ = t;
-            node = Texpr_binary (op.node, tlhs, trhs);
-        }
+        in make_node t (Texpr_binary (op.node, tlhs, trhs))
 
     | Ast.Pexpr_if (cond, then_, else_) ->
         let tcond = type_expr genv lenv cond in
         let tthen = type_expr genv lenv then_ in
         let telse = type_expr genv lenv else_ in
-
         unify tcond.typ Ttyp_boolean;
-
-        if tthen <> telse then (
-            raise (Error (else_.range, "else branch must have the same type as the then branch"))
-        );
-
-        {
-            typ = tthen.typ;
-            node = Texpr_if (tcond, tthen, telse);
-        }
+        unify tthen.typ telse.typ;
+        make_node tthen.typ (Texpr_if (tcond, tthen, telse))
 
     | Ast.Pexpr_do exprs ->
-        let texprs = List.map (fun (e : Ast.expr) -> type_expr genv lenv e) exprs in
+        let texprs = List.map (fun (e : Ast.expr) -> 
+            let te = type_expr genv lenv e in
+            unify te.typ effect_unit;
+            te
+        ) exprs in
         List.iter (fun t -> unify t.typ effect_unit) texprs;
-        {
-            typ = Ttyp_unit;
-            node = Texpr_do texprs;
-        }
+        make_node effect_unit (Texpr_do texprs)
 
     | Ast.Pexpr_let (bindings, e) -> (
+        (* We transform a let expression with multiple bindings to nested let
+           expressions with each a single binding. So the following code:
+
+                let a = e1, b = e2, c = e3 in e
+
+           is transformed to
+                let a = e1 in
+                    let b = e2 in
+                        let c = e3 in
+                            e 
+        *)
+
         match bindings with
             | [] -> type_expr genv lenv e
             | (name, value) :: r -> 
-                let tbinding = type_expr genv lenv value in
-                let texpr = type_expr genv
-                    (SMap.add name.node tbinding.typ lenv)
+                let tvalue = type_expr genv lenv value in
+                let lenv = (SMap.add name.node tvalue.typ lenv) in
+                let texpr = type_expr genv lenv
                     {
                         range = e.range;
                         node = (Ast.Pexpr_let (r, e));
                     }
-                in
-                {
-                    typ = texpr.typ;
-                    node = Texpr_let ((name, tbinding), texpr);
-                }
+                in make_node texpr.typ (Texpr_let ((name, tvalue), texpr))
+    )
+
+    | Ast.Pexpr_variable name -> (
+        match SMap.find_opt name.node lenv with
+            | Some typ -> make_node typ (Texpr_variable name)
+            | None ->
+                (* We handle the variable "unit" differently because it is a
+                   special name for a constant of type unit. But unlike true 
+                   or false, unit is not a keyword and can therefore be redefined
+                   by the user. *)
+                if name.node <> "unit" then
+                    raise (Error (e.range, "unknown variable '" ^ name.node ^ "'"))
+                else 
+                    make_node Ttyp_unit (Texpr_constant (Cunit))
     )
 
     | Ast.Pexpr_apply (name, args) -> (
@@ -170,10 +182,7 @@ let rec type_expr genv lenv e = match e.node with
             let args_type = List.map (fun a -> a.typ) targs in
             let v = Ttyp_variable (V.create ()) in
             unify decl.typ (Ttyp_function (args_type, v));
-            {
-                typ = v;
-                node = Texpr_apply (name, targs)
-            }
+            make_node v (Texpr_apply (name, targs))
     )
     
     | Ast.Pexpr_neg (expr) ->
@@ -201,42 +210,31 @@ let check_arity args expected_arity =
     (List.compare_length_with args expected_arity) = 0
 
 let type_pattern genv lenv pattern = match pattern.node with
-    | Ast.Ppattern_constant c ->
-        type_of_constant c
-
+    | Ast.Ppattern_constant c -> 
+        make_node (type_of_constant c) (Tpattern_constant c)
     | Ast.Ppattern_variable name -> 
-        let typ = Ttyp_variable (V.create ()) in
-        {
-            typ;
-            node = Tpattern_variable (name);
-        }
+        let typ = Ttyp_variable (V.create ()) 
+        in make_node typ (Tpattern_variable (name))
 
     | Ast.Ppattern_constructor (name, patterns) ->
         match Hashtbl.find_opt genv.items name with
         | Some (constructor) -> (
             (* First, we check if we both the pattern arity and the
                expected constructor arity are the same. *)
-            if not (check_arity patterns constructor.arity) then (
+            if not (check_arity patterns constructor.arity) then
                 raise (Error (dummy_range, "mismatch arity"))
-            );
-
-            (* Then, we check if the patterns type match the
-               constructor expected arguments type. *)
-            let tpatterns = List.map (fun p -> 
-                type_pattern genv lenv pattern
-            ) patterns in
-            List.iter2 (fun tpattern expected_type ->
-                unify tpattern.typ expected_type
-            ) tpatterns constructor.args;
-            
-            {
-                typ = constructor.decl.typ;
-                node = Tpattern_constructor (name, tpatterns);
-            }
+            else
+                (* Then, we check if the patterns type match the
+                constructor expected arguments type. *)
+                let tpatterns = List.map (fun p -> 
+                    type_pattern genv lenv pattern
+                ) patterns in
+                List.iter2 (fun tpattern expected_type ->
+                    unify tpattern.typ expected_type
+                ) tpatterns constructor.args;
+                make_node constructor.decl.typ (Tpattern_constructor (name, tpatterns))
         )
-
-        | None -> 
-            raise (Error (dummy_range, "unknown constructor"))
+        | None -> raise (Error (name.range, "unknown constructor"))
 
 (* Find the declaration and all equations corresponding to the given 
    function name as a couple decl * decl list. 
@@ -284,9 +282,6 @@ let rec find_function (fname : string) (decls : decl list) =
 
 let is_non_variable_pattern = function
     | Ppattern_variable _ -> false
-    | Ppattern_variable _ -> false
-    | _ -> true
-    
     | _ -> true
     
 (* Check if a function's equation is valid. *)
