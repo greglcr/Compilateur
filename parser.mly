@@ -99,14 +99,19 @@ decl:
 ;
 
 decl_kind:
-    | DATA name = uident lli = lident* EQ nt = separated_nonempty_list(PIPE, typ)
-         { Pdecl_data (name, lli, nt) }
+    | DATA name = uident targs = lident* EQ constructors = separated_nonempty_list(PIPE, constructor)
+        { Pdecl_data (name, targs, constructors) }
 
-    | CLASS name = uident lli = lident* WHERE LBRACE ltde = separated_list(SEMI, tdecl) RBRACE
-        { Pdecl_class (name, lli, ltde) }
+    | CLASS name = uident targs = lident* WHERE LBRACE decls = separated_list(SEMI, tdecl) RBRACE
+        { Pdecl_class (name, targs, decls) }
 
-    | INSTANCE i = instance WHERE LBRACE ld = separated_list(SEMI, defn) RBRACE
-        { Pdecl_instance (i, ld) }
+    | INSTANCE i = instance WHERE LBRACE decls = separated_list(SEMI, defn) RBRACE
+        { Pdecl_instance (i, decls) }
+;
+
+constructor:
+    | name = uident args = atype*
+        { name, args }
 ;
 
 defn:

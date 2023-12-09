@@ -4,6 +4,7 @@ open Parser
 open Lexer
 open Ast
 open Typedtree
+open Typedprinter
 
 let usage = "usage: ppurs [options] file.purs"
 
@@ -57,6 +58,12 @@ let () =
             close_in c;
             if !parse_only then exit 0;
             let typed_f = Typer.file f in
+
+            let ppf = Format.std_formatter in
+            pp_list pp_expr ppf typed_f;
+            Format.pp_print_newline ppf ();
+            Format.pp_print_flush ppf ();
+
             if !typing_only then exit 0;
         )
     with
@@ -69,6 +76,6 @@ let () =
     | Parser.Error ->
         let range_start = Location.lexeme_start lb in
         let range_end = Location.lexeme_end lb in
-        print_error (range_start range_end) "syntax error"
+        print_error (range_start, range_end) "syntax error"
     | Typer.Error (range, msg) ->
         print_error range msg

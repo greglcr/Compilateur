@@ -83,9 +83,13 @@ type function_decl =
         (* Quantified type variables (the variables after the forall.). *)
         tvars : (string, typ) Hashtbl.t;
         (* Arguments type of the function eventually referencing types in tvars. *)
-        args : typ list;
+        args_type : typ list;
+        (* Function's return type. *)
+        return_type : typ;
         (* Arity of the function, i.e. List.length args *)
         arity : int;
+        (* The function's body expression. *)
+        body : expr;
     }
 
 type constructor_decl =

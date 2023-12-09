@@ -32,7 +32,7 @@ and decl_kind =
     | Pdecl_data of 
         ident (* data name *)
         * (ident list) (* arguments *)
-        * ((ident * typ) list) (* constructors *)
+        * (ident * typ list) list (* constructors *)
     (* a class declaration *)
     | Pdecl_class of 
         ident (* class name *)
