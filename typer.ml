@@ -146,7 +146,8 @@ let rec type_expr genv lenv e = match e.node with
                     boolean_type
                 else
                     (* TODO *)
-                    error_with_hint lhs.range "expected Boolean, Int or String type" ""
+                    let msg = Format.asprintf "type %a is not comparable for == and /=" pp_type tlhs.typ in
+                    error_with_hint tlhs.range msg "expected Boolean, Int or String type"
             | Ast.Blt | Ast.Ble | Ast.Bgt | Ast.Bge ->
                 unify_range tlhs.typ int_type tlhs.range;
                 unify_range trhs.typ int_type trhs.range;
