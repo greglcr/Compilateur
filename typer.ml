@@ -12,7 +12,7 @@ type global_env =
         functions : (string, function_decl) Hashtbl.t;
         constructors : (string, constructor_decl) Hashtbl.t;
         data_types : (string, data_decl) Hashtbl.t;
-        class_types : (string, Typedtree.typ) Hashtbl.t;
+        class_types : (string, class_decl) Hashtbl.t;
     }
 
 (*
@@ -315,6 +315,10 @@ and type_pattern genv lenv pattern = match pattern.node with
     | Ast.Ppattern_constant c ->
         lenv, make_node (type_of_constant c) pattern.range (Tpattern_constant c)
 
+    | Ast.Ppattern_variable { node = "_" } ->
+        let typ = Ttyp_variable (V.create ()) in
+        lenv, make_node typ pattern.range Tpattern_wildcard
+
     | Ast.Ppattern_variable name ->
         let typ = Ttyp_variable (V.create ()) in
         SMap.add name.node typ lenv, make_node typ pattern.range (Tpattern_variable (name))
@@ -357,7 +361,7 @@ let is_non_variable_pattern = function
     | _ -> true
 
 (* Check if a function's equation is valid. *)
-let type_function_equation genv decl (expected_arity, expected_args_type, expected_ret_type) (name, patterns, body) =
+let type_function_equation genv decl (expected_arity, expected_args_type, expected_ret_type) pattern_idx (name, patterns, body) =
     (* We start to check if the equation's arity is the same as
        the expected arity. *)
     let args_length = List.length patterns in
@@ -373,7 +377,10 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
         unify_range typed_pattern.typ expected_type typed_pattern.range;
         (match typed_pattern.node with
             | Tpattern_variable v ->
-                lenv := SMap.add v.node typed_pattern.typ !lenv
+                if Option.is_none (SMap.find_opt v.node !lenv) then 
+                    lenv := SMap.add v.node typed_pattern.typ !lenv
+                else
+                    error typed_pattern.range ("pattern variable " ^ v.node ^ " appears more than once")
             | _ -> ());
         typed_pattern
     )) patterns expected_args_type in 
@@ -439,9 +446,10 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     Hashtbl.add genv.functions name.node function_decl;
 
     (* Check if all function's equations are correctly typed. *)
+    let pattern_idx = ref None in
     let tequations = List.map (fun eq -> match eq.node with
         | Pdecl_equation (name, patterns, body) ->
-            snd (type_function_equation genv decl (arity, expected_args_type, expected_ret_type) (name, patterns, body))
+            snd (type_function_equation genv decl (arity, expected_args_type, expected_ret_type) pattern_idx (name, patterns, body))
         | _ -> failwith "unexpected"
     ) equations in
 
@@ -514,7 +522,7 @@ let type_data genv name range tvars constructors =
    Class Typing
 *)
 
-let type_class_field genv lenv decl = match decl with
+let type_class_field genv lenv decl = match decl.node with
     | Pdecl_function (name, tvars, instances, args_type, return_type) -> ()
     | _ -> assert false
 
@@ -522,7 +530,7 @@ let type_class genv name range tvars fields =
     let lenv, tvars_type = make_lenv_from_tvars tvars in
 
     let tfields = List.map (type_class_field genv lenv) fields in
-    make_node unit_type range (Tdecl_class name tfields)
+    make_node unit_type range (Tdecl_class name)
 
 let mk_builtin_function name args_type return_type =
     {

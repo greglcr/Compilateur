@@ -34,7 +34,6 @@ and decl_kind =
         * constructor list (* constructors *)
     | Tdecl_class of
         Ast.ident (* class name *)
-        * decl list (* class declarations fields *)
 
 (* a data constructor *)
 and constructor = Ast.ident * typ list
@@ -69,6 +68,8 @@ and binding = Ast.ident * expr
 
 and pattern = pattern_kind typed_node
 and pattern_kind =
+    (* _ *)
+    | Tpattern_wildcard
     (* e.g. 42 *)
     | Tpattern_constant of Ast.constant
     (* e.g. foo *)
