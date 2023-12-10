@@ -37,12 +37,12 @@ let report (b,e) =
 
 let print_error (range_start, range_end) msg =
     Location.print file range_start range_end;
-    eprintf "\x1b[1;31mError\x1b[0m: %s@." msg;
+    eprintf "\n\x1b[1;31mError\x1b[0m: %s@." msg;
     exit 1
 
 let print_error_with_hint (range_start, range_end) msg hint =
     Location.print file range_start range_end;
-    eprintf "\x1b[1;31mError\x1b[0m: %s@." msg;
+    eprintf "\n\x1b[1;31mError\x1b[0m: %s@." msg;
     eprintf "\x1b[3mNote: %s\x1b[0m@." hint;
     exit 1
 
