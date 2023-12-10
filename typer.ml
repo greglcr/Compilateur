@@ -54,7 +54,7 @@ and unify_params p1 p2 = match (p1, p2) with
     | [], [] -> ()
     | t1::r1, t2::r2 -> unify t1 t2; unify_params r1 r2
     | [], _
-    | _, [] -> error Location.dummy_range "not the same number of parameters"
+    | _, [] -> failwith "not the same number of parameters"
 
 let rec pp_list pp_v fmt = function
     | [] -> ()
@@ -517,6 +517,7 @@ let default_genv =
     Hashtbl.add data_types "String" { name = fill_with_dummy_range "String"; data_type = string_type };
     Hashtbl.add data_types "Effect" { name = fill_with_dummy_range "Effect"; data_type = effect_unit };
 
+    (* the constant unit is handled separately in type_expr *)
     Hashtbl.add functions "not" (mk_builtin_function (fill_with_dummy_range "not") [boolean_type] boolean_type);
     Hashtbl.add functions "mod" (mk_builtin_function (fill_with_dummy_range "mod") [int_type; int_type] int_type);
     Hashtbl.add functions "log" (mk_builtin_function (fill_with_dummy_range "log") [string_type] effect_unit);
