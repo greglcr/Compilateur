@@ -682,7 +682,7 @@ let file decls =
 (*
     We implement the algorithm described here:
         http://moscova.inria.fr/~maranget/papers/warn
-    Based on explainations from here:
+    Based on explanations from here:
         https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/pattern/usefulness/index.html
 *)
 
