@@ -81,6 +81,8 @@ let unify_range t1 t2 range =
     any source or user typed identifier. *)
 let dummy_ident = { range = Location.dummy_range; node = "$"}
 
+let fill_with_dummy_range node = { range = Location.dummy_range; node }
+
 let type_of_constant c = match c with
     | Ast.Cbool _ -> boolean_type
     | Ast.Cint _ -> int_type
@@ -195,6 +197,17 @@ let rec type_expr genv lenv e = match e.node with
         match Hashtbl.find_opt genv.functions name.node with
         | None -> error name.range ("unknown value " ^ name.node)
         | Some (func_decl) ->
+            (* Check the count of arguments. *)
+            let args_count = List.length args in
+            if args_count <> func_decl.arity then (
+                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst func_decl.name.range).lineno in
+                let msg = Printf.sprintf 
+                    "function %s expected %d argument(s), but got %d argument(s)" 
+                    name.node 
+                    func_decl.arity 
+                    args_count 
+                in error_with_hint name.range msg hint);
+
             let targs = List.map (type_expr genv lenv) args in
             let args_type = List.map (fun e -> e.typ) targs in
             let _, func_args_type = make_sigma func_decl.tvars (func_decl.return_type :: func_decl.args_type) in
@@ -212,6 +225,16 @@ let rec type_expr genv lenv e = match e.node with
         match Hashtbl.find_opt genv.constructors name.node with
         | None -> error name.range ("unknown data constructor " ^ name.node)
         | Some (constructor_decl) ->
+            let args_count = List.length args in
+            if args_count <> constructor_decl.arity then (
+                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst constructor_decl.name.range).lineno in
+                let msg = Printf.sprintf 
+                    "constructor %s expected %d argument(s), but got %d argument(s)" 
+                    name.node 
+                    constructor_decl.arity 
+                    args_count
+                in error_with_hint name.range msg hint);
+
             let targs = List.map (type_expr genv lenv) args in
             let args_type = List.map (fun e -> e.typ) targs in
             let data_type = constructor_decl.parent_type in
@@ -341,7 +364,7 @@ let rec find_function (fname : string) (decls : decl list) =
     let decl, equations = loop None [] decls in
     (* Check if the function has a at least one declaration specified. *)
     if Option.is_none decl then (
-        error !range_to_use ("no function declaration for '" ^ fname ^ "'")
+        error !range_to_use ("function " ^ fname ^ " has no type declaration")
     ) else (
         (Option.get decl), equations
     )
@@ -354,8 +377,10 @@ let is_non_variable_pattern = function
 let type_function_equation genv decl (expected_arity, expected_args_type, expected_ret_type) (name, patterns, body) =
     (* We start to check if the equation's arity is the same as
        the expected arity. *)
-    if (List.compare_length_with patterns expected_arity) <> 0 then (
-        error decl.range "arity mismatch"
+    let args_length = List.length patterns in
+    if args_length <> expected_arity then (
+        let hint = Format.asprintf "has %d argument(s), but type declaration requires %d argument(s)" args_length expected_arity in
+        error_with_hint name.range "function arity mismatch with type declaration" hint
     );
 
     let lenv = ref SMap.empty in
@@ -387,13 +412,13 @@ let rec from_ast_type genv lenv (typ : Ast.typ) = match typ.node with
     | Ptyp_variable v -> (
         match Hashtbl.find_opt lenv v with
             | Some t -> t
-            | None -> error typ.range ("unknown type variable '" ^ v ^ "'")
+            | None -> error typ.range ("type variable " ^ v ^ " is undefined")
     )
 
     | Ptyp_data (name, args) ->
         match Hashtbl.find_opt genv.data_types name.node with
             | Some data_type -> Ttyp_data (name.node, List.map (from_ast_type genv lenv) args)
-            | None -> error name.range ("unknown constructor '" ^ name.node ^ "'")
+            | None -> error name.range ("unknown type " ^ name.node)
 
 let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     let tvars, expected_args_type, expected_ret_type = match decl.node with
@@ -410,7 +435,7 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
 
     let function_decl = 
     {
-        name = name.node;
+        name = name;
         tvars;
         args_type = expected_args_type;
         return_type = expected_ret_type;
@@ -447,7 +472,7 @@ let type_data_constructor genv lenv tvars parent_type (name, args) =
     let targs = List.map (from_ast_type genv lenv) args in
 
     Hashtbl.add genv.constructors name.node {
-        name = name.node;
+        name = name;
         tvars;
         parent_type;
         args_type = targs;
@@ -486,20 +511,20 @@ let default_genv =
     let data_types = Hashtbl.create 17 in
     let class_types = Hashtbl.create 17 in
 
-    Hashtbl.add data_types "Unit" { name = { range = Location.dummy_range; node = "Unit" }; data_type = unit_type };
-    Hashtbl.add data_types "Boolean" { name = { range = Location.dummy_range; node = "Boolean" }; data_type = boolean_type };
-    Hashtbl.add data_types "Int" { name = { range = Location.dummy_range; node = "Int" }; data_type = int_type };
-    Hashtbl.add data_types "String" { name = { range = Location.dummy_range; node = "String" }; data_type = string_type };
-    Hashtbl.add data_types "Effect" { name = { range = Location.dummy_range; node = "Effect" }; data_type = effect_unit };
+    Hashtbl.add data_types "Unit" { name = fill_with_dummy_range "Unit"; data_type = unit_type };
+    Hashtbl.add data_types "Boolean" { name = fill_with_dummy_range "Boolean"; data_type = boolean_type };
+    Hashtbl.add data_types "Int" { name = fill_with_dummy_range "Int"; data_type = int_type };
+    Hashtbl.add data_types "String" { name = fill_with_dummy_range "String"; data_type = string_type };
+    Hashtbl.add data_types "Effect" { name = fill_with_dummy_range "Effect"; data_type = effect_unit };
 
-    Hashtbl.add functions "not" (mk_builtin_function "not" [boolean_type] boolean_type);
-    Hashtbl.add functions "mod" (mk_builtin_function "mod" [int_type; int_type] int_type);
-    Hashtbl.add functions "log" (mk_builtin_function "log" [string_type] effect_unit);
+    Hashtbl.add functions "not" (mk_builtin_function (fill_with_dummy_range "not") [boolean_type] boolean_type);
+    Hashtbl.add functions "mod" (mk_builtin_function (fill_with_dummy_range "mod") [int_type; int_type] int_type);
+    Hashtbl.add functions "log" (mk_builtin_function (fill_with_dummy_range "log") [string_type] effect_unit);
 
     let a = Ttyp_variable (V.create ()) in
     let tvars = Hashtbl.create 1 in Hashtbl.add tvars "a" a;
     Hashtbl.add functions "pure" {
-        name = "pure";
+        name = fill_with_dummy_range "pure";
         tvars;
         args_type = [a];
         return_type = (Ttyp_data ("Effect", [a]));

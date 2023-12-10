@@ -79,7 +79,7 @@ and branch = pattern * expr
 type function_decl =
     {
         (* The function's name. *)
-        name : string;
+        name : Ast.ident;
         (* Quantified type variables (the variables after the forall.). *)
         tvars : (string, typ) Hashtbl.t;
         (* Arguments type of the function eventually referencing types in tvars. *)
@@ -93,7 +93,7 @@ type function_decl =
 type constructor_decl =
     {
         (* The constructor's name. *)
-        name : string;
+        name : Ast.ident;
         (* Quantified type variables (the variables after the forall.). *)
         tvars : (string, typ) Hashtbl.t;
         parent_type : typ;
