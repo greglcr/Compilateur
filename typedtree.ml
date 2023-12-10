@@ -108,6 +108,8 @@ type data_decl =
     {
         name : Ast.ident;
         data_type : typ;
+        (* Arity of the data type, that is the count of type arguments. *)
+        arity : int;
     }
 
 module V = struct

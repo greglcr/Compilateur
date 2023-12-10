@@ -14,7 +14,11 @@ let dummy =
         colno = 0;
     }
 
+let is_dummy t = t = dummy
+
 let dummy_range = dummy, dummy
+
+let is_dummy_range (s, e) = (is_dummy s) || (is_dummy e)
 
 let from_lexing_position (p : Lexing.position) =
     {
@@ -43,7 +47,7 @@ let file_lines filename =
 
 let print (file : string) (s : t) (e : t) =
     let lines = file_lines file in
-    let line = List.nth_opt lines (s.lineno - 1) in
+    let line = if s.lineno > 0 then List.nth_opt lines (s.lineno - 1) else None in
     Printf.eprintf "\x1b[1mFile \"%s\", line %d, characters %d-%d:\x1b[0m\n" file s.lineno s.colno e.colno;
     match line with
         | Some (line) -> 

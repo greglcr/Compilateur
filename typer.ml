@@ -209,11 +209,11 @@ let rec type_expr genv lenv e = match e.node with
                 in error_with_hint name.range msg hint);
 
             let targs = List.map (type_expr genv lenv) args in
-            let args_type = List.map (fun e -> e.typ) targs in
             let _, func_args_type = make_sigma func_decl.tvars (func_decl.return_type :: func_decl.args_type) in
             (* List.hd func_args_type is the function's return type and
                List.tl func_args_type are the function's arguments type. *)
-            unify_params (List.tl func_args_type) args_type; (* unify parameters *)
+            (* unify parameters *)
+            List.iter2 (fun targ expected_ty -> unify_range targ.typ expected_ty targ.range) targs (List.tl func_args_type);
             let return_type = Ttyp_variable (V.create ()) in
             unify_range (List.hd func_args_type) return_type e.range; (* unify return type *)
             make_node return_type e.range (Texpr_apply (name, targs))
@@ -236,12 +236,12 @@ let rec type_expr genv lenv e = match e.node with
                 in error_with_hint name.range msg hint);
 
             let targs = List.map (type_expr genv lenv) args in
-            let args_type = List.map (fun e -> e.typ) targs in
             let data_type = constructor_decl.parent_type in
             let _, constructor_args_type = make_sigma constructor_decl.tvars (data_type :: constructor_decl.args_type) in
             (* List.hd constructor_args_type is the constructor's return type and
                List.tl constructor_args_type are the constructor's arguments type. *)
-            unify_params (List.tl constructor_args_type) args_type; (* unify parameters *)
+            (* unify parameters *)
+            List.iter2 (fun targ expected_ty -> unify_range targ.typ expected_ty targ.range) targs (List.tl constructor_args_type);
             let return_type = Ttyp_variable (V.create ()) in
             unify_range (List.hd constructor_args_type) return_type e.range; (* unify return type *)
             make_node return_type e.range (Texpr_constructor (name, targs))
@@ -326,48 +326,23 @@ and type_pattern genv lenv pattern = match pattern.node with
         | None -> error name.range ("unknown data constructor " ^ name.node)
     )
 
-(* Find the declaration and all equations corresponding to the given 
-   function name as a couple decl * decl list. 
-   
-   If no declaration is found for the function or if there is multiple
-   declarations for the same function, then an error is emitted at
-   the location either of the last declaration or the first function
-   equation. *)
-let rec find_function (fname : string) (decls : decl list) =
-    let range_to_use = ref (Location.dummy, Location.dummy) in
-    let rec loop function_decl equations decls = match decls with
-        | [] -> function_decl, equations
+(* Find all the consecutive function equations for the function named fname.
+   This also returns all the remaining declarations that are not part of
+   the function's equations. *)
+let rec collect_equations (fname : string) (decls : decl list) =
+    let rec loop equations decls = match decls with
+        | [] -> equations, []
         | decl :: r -> (
             match decl.node with
                 (* A function equation, just store it and continue the scanning. *)
-                | Pdecl_equation (name, _, _) when name.node = fname -> (
-                    range_to_use := decl.range;
-                    loop function_decl (decl :: equations) r
-                )
-
-                (* A function declaration. We need to check if there is no multiple
-                   declarations for the same function as it is an error. *)
-                | Pdecl_function (name, _, _, _, _) when name.node = fname -> (
-                    if Option.is_some function_decl then (
-                        (* The function has multiple declarations which is not allowed. *)
-                        error decl.range ("function '" ^ fname ^ "' declared multiple times")
-                    ) else (
-                        loop (Some decl) equations r
-                    )
-                )
+                | Pdecl_equation (name, _, _) when name.node = fname ->
+                    loop (decl :: equations) r
 
                 (* Either not a function with the same name or not a function at all.
-                   We just ignore it and continue our scanning. *)
-                | _ -> loop function_decl equations r
+                   We found all the function equations. *)
+                | _ -> equations, decl :: r
             )
-    in
-    let decl, equations = loop None [] decls in
-    (* Check if the function has a at least one declaration specified. *)
-    if Option.is_none decl then (
-        error !range_to_use ("function " ^ fname ^ " has no type declaration")
-    ) else (
-        (Option.get decl), equations
-    )
+    in loop [] decls
 
 let is_non_variable_pattern = function
     | Ppattern_variable _ -> false
@@ -379,13 +354,13 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
        the expected arity. *)
     let args_length = List.length patterns in
     if args_length <> expected_arity then (
-        let hint = Format.asprintf "has %d argument(s), but type declaration requires %d argument(s)" args_length expected_arity in
-        error_with_hint name.range "function arity mismatch with type declaration" hint
+        let hint = Format.asprintf "got %d, but type declaration requires %d" args_length expected_arity in
+        error_with_hint name.range ("incorrect number of arguments for function " ^ name.node) hint
     );
 
     let lenv = ref SMap.empty in
     (* Then, we check if each pattern is correctly typed. *)
-    let typed_patterns = List.map2 (fun pattern expected_type -> (
+    let tpatterns = List.map2 (fun pattern expected_type -> (
         let _, typed_pattern = type_pattern genv !lenv pattern in
         unify_range typed_pattern.typ expected_type typed_pattern.range;
         (match typed_pattern.node with
@@ -396,7 +371,7 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
     )) patterns expected_args_type in 
     let tbody = type_expr genv !lenv body in
     unify_range tbody.typ expected_ret_type body.range;
-    tbody
+    tpatterns, tbody
 
     (* TODO:
         (* We also check that there is at most one non-variable pattern
@@ -417,10 +392,22 @@ let rec from_ast_type genv lenv (typ : Ast.typ) = match typ.node with
 
     | Ptyp_data (name, args) ->
         match Hashtbl.find_opt genv.data_types name.node with
-            | Some data_type -> Ttyp_data (name.node, List.map (from_ast_type genv lenv) args)
+            | Some { arity } ->
+                let args_count = List.length args in
+                if args_count <> arity then (
+                    let hint = Format.asprintf "got %d, but %d is required" args_count arity in
+                    error_with_hint name.range ("incorrect number of type variables for data " ^ name.node) hint
+                );
+
+                Ttyp_data (name.node, List.map (from_ast_type genv lenv) args)
+
             | None -> error name.range ("unknown type " ^ name.node)
 
 let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
+    if equations = [] then (
+        error decl.range ("type declaration of " ^ name.node ^ " should be followed by its definition")
+    );
+
     let tvars, expected_args_type, expected_ret_type = match decl.node with
         | Pdecl_function (_, quantified_vars, _, args_type, ret_type) ->
             let tvars = Hashtbl.create 17 in
@@ -444,9 +431,9 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     Hashtbl.add genv.functions name.node function_decl;
 
     (* Check if all function's equations are correctly typed. *)
-    let typed_equations = List.map (fun eq -> match eq.node with
+    let tequations = List.map (fun eq -> match eq.node with
         | Pdecl_equation (name, patterns, body) ->
-            type_function_equation genv decl (arity, expected_args_type, expected_ret_type) (name, patterns, body)
+            snd (type_function_equation genv decl (arity, expected_args_type, expected_ret_type) (name, patterns, body))
         | _ -> failwith "unexpected"
     ) equations in
 
@@ -466,32 +453,43 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
                     pn -> en *)
     
     let function_type = Ttyp_function (expected_args_type, expected_ret_type) in
-    make_node function_type decl.range (Tdecl_function (name, [], List.hd typed_equations))
+    make_node function_type decl.range (Tdecl_function (name, [], List.hd tequations))
 
 let type_data_constructor genv lenv tvars parent_type (name, args) =
     let targs = List.map (from_ast_type genv lenv) args in
 
-    Hashtbl.add genv.constructors name.node {
-        name = name;
-        tvars;
-        parent_type;
-        args_type = targs;
-        arity = List.length args;
-     };
+    match Hashtbl.find_opt genv.constructors name.node with
+        | None ->
+            Hashtbl.add genv.constructors name.node {
+                name = name;
+                tvars;
+                parent_type;
+                args_type = targs;
+                arity = List.length args;
+            };
+            (name, targs)
 
-    (name, targs)
+        | Some previous_decl ->
+            let previous_decl_line = (fst previous_decl.name.range).lineno in
+            let hint = Format.sprintf "data constructor %s was declared before at line %d" name.node previous_decl_line in
+            error_with_hint name.range ("redeclaration of data constructor " ^ name.node) hint
 
 let type_data genv name range tvars constructors =
     let lenv = Hashtbl.create 17 in
     let tvars_type = ref [] in
-    List.iter (fun tvar -> 
-        let t = Ttyp_variable (V.create ()) in
-        Hashtbl.add lenv tvar.node t;
-        tvars_type := t :: !tvars_type
+    List.iter (fun tvar ->
+        match Hashtbl.find_opt lenv tvar.node with
+        | None ->
+            let t = Ttyp_variable (V.create ()) in
+            Hashtbl.add lenv tvar.node t;
+            tvars_type := t :: !tvars_type
+
+        | Some _ ->
+            error tvar.range ("type argument " ^ tvar.node ^ " appears more than once")
     ) tvars;
 
     let data_type = Ttyp_data (name.node, !tvars_type) in
-    Hashtbl.add genv.data_types name.node { name; data_type; };
+    Hashtbl.add genv.data_types name.node { name; data_type; arity = List.length tvars };
     
     let tconstructors = List.map (type_data_constructor genv lenv lenv data_type) constructors in
     make_node data_type range (Tdecl_data (name, tconstructors))
@@ -511,11 +509,11 @@ let default_genv =
     let data_types = Hashtbl.create 17 in
     let class_types = Hashtbl.create 17 in
 
-    Hashtbl.add data_types "Unit" { name = fill_with_dummy_range "Unit"; data_type = unit_type };
-    Hashtbl.add data_types "Boolean" { name = fill_with_dummy_range "Boolean"; data_type = boolean_type };
-    Hashtbl.add data_types "Int" { name = fill_with_dummy_range "Int"; data_type = int_type };
-    Hashtbl.add data_types "String" { name = fill_with_dummy_range "String"; data_type = string_type };
-    Hashtbl.add data_types "Effect" { name = fill_with_dummy_range "Effect"; data_type = effect_unit };
+    Hashtbl.add data_types "Unit" { name = fill_with_dummy_range "Unit"; data_type = unit_type; arity = 0 };
+    Hashtbl.add data_types "Boolean" { name = fill_with_dummy_range "Boolean"; data_type = boolean_type; arity = 0 };
+    Hashtbl.add data_types "Int" { name = fill_with_dummy_range "Int"; data_type = int_type; arity = 0 };
+    Hashtbl.add data_types "String" { name = fill_with_dummy_range "String"; data_type = string_type; arity = 0 };
+    Hashtbl.add data_types "Effect" { name = fill_with_dummy_range "Effect"; data_type = effect_unit; arity = 1 };
 
     (* the constant unit is handled separately in type_expr *)
     Hashtbl.add functions "not" (mk_builtin_function (fill_with_dummy_range "not") [boolean_type] boolean_type);
@@ -542,33 +540,41 @@ let default_genv =
 let file decls = 
     let genv = default_genv in
     (* Collect all declarations: *)
-    List.fold_left (fun acc decl -> (
-        match decl.node with
-            (* Handle functions *)
-            | Pdecl_equation (name, _, _)
-            | Pdecl_function (name, _, _, _, _) -> (
-                match Hashtbl.find_opt genv.functions name.node with
-                    | None ->
-                        let decl, equations = find_function name.node decls in
-                        let tdecl = type_function genv name decl equations in
-                        tdecl :: acc
-                    | Some _ ->
-                        (* Ignore it as this declaration was already handled by find_function
-                        at the first time this function's name was encountered. *)
-                        acc
-            )
+    let rec loop acc decls = match decls with
+        | [] -> acc
+        | decl :: r ->
+            match decl.node with
+                (* Handle functions *)
+                | Pdecl_equation (name, _, _) ->
+                    error name.range ("value " ^ name.node ^ " has no type declaration")
 
-            (* Handle data types and constructors *)
-            | Pdecl_data (name, tvars, constructors) -> (
-                match Hashtbl.find_opt genv.data_types name.node with
-                    | None -> (type_data genv name decl.range tvars constructors) :: acc
-                    
-                    | Some (previous_decl) ->
-                        let previous_decl_line = (fst previous_decl.name.range).lineno in
-                        let hint = Format.sprintf "data type %s was declared before at line %d" name.node previous_decl_line in
-                        error_with_hint name.range ("redeclaration of data type " ^ name.node) hint
-            )
+                | Pdecl_function (name, _, _, _, _) -> (
+                    match Hashtbl.find_opt genv.functions name.node with
+                        | None ->
+                            let equations, next_decls = collect_equations name.node r in
+                            let tdecl = type_function genv name decl equations in
+                            loop (tdecl :: acc) next_decls
+                        | Some previous_decl ->
+                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let hint = Format.sprintf "previous declaration of value %s is at line %d" name.node previous_decl_line in
+                            error_with_hint name.range ("redeclaration of value " ^ name.node) hint
+                )
+                (* Handle data types and constructors *)
+                | Pdecl_data (name, tvars, constructors) -> (
+                    match Hashtbl.find_opt genv.data_types name.node with
+                        | None -> loop ((type_data genv name decl.range tvars constructors) :: acc) r
+                        
+                        | Some previous_decl ->
+                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let hint = Format.sprintf "previous declaration of data type %s is at line %d" name.node previous_decl_line in
+                            error_with_hint name.range ("redeclaration of data type " ^ name.node) hint
+                )
 
-            | Pdecl_class (name, _, _) -> failwith "class declarations not yet implemented"
-            | Pdecl_instance (_, _) -> failwith "instance declarations not yet implemented"
-    )) [] decls
+                | Pdecl_class (name, _, _) -> failwith "class declarations not yet implemented"
+                | Pdecl_instance (_, _) -> failwith "instance declarations not yet implemented"
+    in let tdecls = loop [] decls in
+
+    if Option.is_none (Hashtbl.find_opt genv.functions "main") then
+        error Location.dummy_range "value main is missing"
+    else
+        tdecls
