@@ -544,7 +544,6 @@ let file decls =
         | [] -> acc
         | decl :: r ->
             match decl.node with
-                (* Handle functions *)
                 | Pdecl_equation (name, _, _) ->
                     error name.range ("value " ^ name.node ^ " has no type declaration")
 
@@ -559,11 +558,10 @@ let file decls =
                             let hint = Format.sprintf "previous declaration of value %s is at line %d" name.node previous_decl_line in
                             error_with_hint name.range ("redeclaration of value " ^ name.node) hint
                 )
-                (* Handle data types and constructors *)
+                
                 | Pdecl_data (name, tvars, constructors) -> (
                     match Hashtbl.find_opt genv.data_types name.node with
                         | None -> loop ((type_data genv name decl.range tvars constructors) :: acc) r
-                        
                         | Some previous_decl ->
                             let previous_decl_line = (fst previous_decl.name.range).lineno in
                             let hint = Format.sprintf "previous declaration of data type %s is at line %d" name.node previous_decl_line in
@@ -571,6 +569,7 @@ let file decls =
                 )
 
                 | Pdecl_class (name, _, _) -> failwith "class declarations not yet implemented"
+                
                 | Pdecl_instance (_, _) -> failwith "instance declarations not yet implemented"
     in let tdecls = loop [] decls in
 
