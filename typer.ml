@@ -121,6 +121,10 @@ let make_sigma tvars args =
     in let new_args = List.map explore_type args in
     (new_tvars, new_args)
 
+(* ========================================================
+   Expression Typing
+*)
+
 (* Checks if the given type has the Eq type class defined for it.
    In other terms, returns true if typ can be compared using == or /=. *)
 let is_equalable_type typ =
@@ -326,6 +330,10 @@ and type_pattern genv lenv pattern = match pattern.node with
         | None -> error name.range ("unknown data constructor " ^ name.node)
     )
 
+(* ========================================================
+   Function Typing
+*)
+
 (* Find all the consecutive function equations for the function named fname.
    This also returns all the remaining declarations that are not part of
    the function's equations. *)
@@ -455,14 +463,18 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     let function_type = Ttyp_function (expected_args_type, expected_ret_type) in
     make_node function_type decl.range (Tdecl_function (name, [], List.hd tequations))
 
-let type_data_constructor genv lenv tvars parent_type (name, args) =
+(* ========================================================
+   Data Typing
+*)
+
+let type_data_constructor genv lenv parent_type (name, args) =
     let targs = List.map (from_ast_type genv lenv) args in
 
     match Hashtbl.find_opt genv.constructors name.node with
         | None ->
             Hashtbl.add genv.constructors name.node {
                 name = name;
-                tvars;
+                tvars = lenv;
                 parent_type;
                 args_type = targs;
                 arity = List.length args;
@@ -474,7 +486,7 @@ let type_data_constructor genv lenv tvars parent_type (name, args) =
             let hint = Format.sprintf "data constructor %s was declared before at line %d" name.node previous_decl_line in
             error_with_hint name.range ("redeclaration of data constructor " ^ name.node) hint
 
-let type_data genv name range tvars constructors =
+let make_lenv_from_tvars tvars =
     let lenv = Hashtbl.create 17 in
     let tvars_type = ref [] in
     List.iter (fun tvar ->
@@ -487,12 +499,30 @@ let type_data genv name range tvars constructors =
         | Some _ ->
             error tvar.range ("type argument " ^ tvar.node ^ " appears more than once")
     ) tvars;
+    lenv, tvars_type
+
+let type_data genv name range tvars constructors =
+    let lenv, tvars_type = make_lenv_from_tvars tvars in
 
     let data_type = Ttyp_data (name.node, !tvars_type) in
     Hashtbl.add genv.data_types name.node { name; data_type; arity = List.length tvars };
     
-    let tconstructors = List.map (type_data_constructor genv lenv lenv data_type) constructors in
+    let tconstructors = List.map (type_data_constructor genv lenv data_type) constructors in
     make_node data_type range (Tdecl_data (name, tconstructors))
+
+(* ========================================================
+   Class Typing
+*)
+
+let type_class_field genv lenv decl = match decl with
+    | Pdecl_function (name, tvars, instances, args_type, return_type) -> ()
+    | _ -> assert false
+
+let type_class genv name range tvars fields =
+    let lenv, tvars_type = make_lenv_from_tvars tvars in
+
+    let tfields = List.map (type_class_field genv lenv) fields in
+    make_node unit_type range (Tdecl_class name tfields)
 
 let mk_builtin_function name args_type return_type =
     {
@@ -568,7 +598,14 @@ let file decls =
                             error_with_hint name.range ("redeclaration of data type " ^ name.node) hint
                 )
 
-                | Pdecl_class (name, _, _) -> failwith "class declarations not yet implemented"
+                | Pdecl_class (name, tvars, fields) -> (
+                    match Hashtbl.find_opt genv.class_types name.node with
+                        | None -> loop ((type_class genv name decl.range tvars fields) :: acc) r
+                        | Some previous_decl ->
+                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let hint = Format.sprintf "previous declaration of class type %s is at line %d" name.node previous_decl_line in
+                            error_with_hint name.range ("redeclaration of class type " ^ name.node) hint
+                )
                 
                 | Pdecl_instance (_, _) -> failwith "instance declarations not yet implemented"
     in let tdecls = loop [] decls in
@@ -577,3 +614,51 @@ let file decls =
         error Location.dummy_range "value main is missing"
     else
         tdecls
+
+(* --------------------------------------------------------
+   Pattern Matching Typing
+*)
+
+(*
+    We implement the algorithm described here:
+        http://moscova.inria.fr/~maranget/papers/warn
+    Based on explainations from here:
+        https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/pattern/usefulness/index.html
+*)
+
+(* type specialize_constructor = SCconstant of Ast.constant | SCdata of constructor_decl
+
+let specialize c p = match p.node with
+    | Tpattern_constant constant1 ->(
+        match c with
+            | SCconstant constant2 when constant1 = constant2 -> Some []
+            | _ -> None)
+    | Tpattern_constructor (name, args) -> (
+        match c with
+            | SCdata constructor when constructor.name.node = name.node -> Some []
+            | _ -> None)
+    | _ -> None
+
+(* Returns the first k elements of a list. *)
+let rec firstk k xs = match xs with
+    | [] -> failwith "firstk"
+    | x::xs -> 
+        if k=1 then [x], xs 
+        else let x', xs' = firstk (k-1) xs in x::x', xs'
+
+let unspecialize c p = match c with
+    | SCconstant constant -> (make_node (type_of_constant constant) Location.dummy_range (Tpattern_constant constant)) :: p
+    | SCdata constructor -> (
+        let args, p = firstk constructor.arity p in
+        (make_node constructor.parent_type Location.dummy_range (Tpattern_constructor (constructor.name, args))) :: p
+    )
+
+let rec usefulness patterns typ q = match typ with
+    | [] ->
+        if patterns = [] then
+            Some []
+        else
+            None
+
+    | _ ->
+        List.filter_map (fun x -> x) (List.map (fun c -> specialize q) [CSconstant (Cunit)]) *)

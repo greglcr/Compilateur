@@ -25,13 +25,16 @@ and decl = decl_kind typed_node
 and decl_kind =
     (* a function declaration *)
     | Tdecl_function of 
-        Ast.ident (* function's name *)
+        Ast.ident (* function name *)
         * param list (* parameters *)
-        * expr (* function's body *)
+        * expr (* function body *)
     (* a data declaration *)
     | Tdecl_data of 
-        Ast.ident (* data's name *)
+        Ast.ident (* data name *)
         * constructor list (* constructors *)
+    | Tdecl_class of
+        Ast.ident (* class name *)
+        * decl list (* class declarations fields *)
 
 (* a data constructor *)
 and constructor = Ast.ident * typ list
@@ -109,6 +112,13 @@ type data_decl =
         name : Ast.ident;
         data_type : typ;
         (* Arity of the data type, that is the count of type arguments. *)
+        arity : int;
+    }
+
+type class_decl =
+    {
+        name : Ast.ident;
+        (* Arity of the class type, that is the count of type arguments. *)
         arity : int;
     }
 

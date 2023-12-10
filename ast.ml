@@ -37,11 +37,11 @@ and decl_kind =
     | Pdecl_class of 
         ident (* class name *)
         * ident list (* arguments *)
-        * decl list (* class's declarations (fields) *)
+        * decl list (* class declarations (fields) *)
     (* an instance declaration *)
     | Pdecl_instance of 
-        instance (* instance's target *)
-        * decl list (* instance's declarations (fields) *)
+        instance (* instance target *)
+        * decl list (* instance declarations (fields) *)
 
 (* a data constructor *)
 and constructor = ident * typ list
