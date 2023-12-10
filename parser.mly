@@ -206,7 +206,7 @@ atom:
         { mk_node $loc (Pexpr_variable name) }
 
     | name = uident
-        { mk_node $loc (Pexpr_apply (name, [])) }
+        { mk_node $loc (Pexpr_constructor (name, [])) }
 
     | LPAR e = expr RPAR
         { e }
@@ -222,8 +222,10 @@ expr:
 (* expr without location *)
 expr_kind:
     | name = lident args = atom+
-    | name = uident args = atom+
         { Pexpr_apply (name, args) }
+
+    | name = uident args = atom+
+        { Pexpr_constructor (name, args) }
 
     | MINUS e = expr %prec UNARY_MINUS
         { Pexpr_neg (e) }

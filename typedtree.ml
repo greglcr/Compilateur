@@ -1,16 +1,6 @@
 (* Typed tree of MiniPureScript *)
 
 type typ =
-    (* type of the "unit" constant *)
-    | Ttyp_unit
-    (* type of "true" and "false" *)
-    | Ttyp_boolean
-    (* type of integer constants *)
-    | Ttyp_int
-    (* type of string constants *)
-    | Ttyp_string
-    (* builtin data type Effect *)
-    | Ttyp_effect of typ
     (* a quantified type variable, to be unified. *)
     | Ttyp_variable of tvar
     (* type of a function (constructors are not functions) *)
@@ -26,9 +16,8 @@ and tvar =
 
 and 'a typed_node = 
     {
-        (* The type of the tree node. *)
         typ : typ;
-        (* The underlying node. *)
+        range : Location.range;
         node : 'a;
     }
 
@@ -107,10 +96,29 @@ type constructor_decl =
         name : string;
         (* Quantified type variables (the variables after the forall.). *)
         tvars : (string, typ) Hashtbl.t;
-        data_type : typ;
+        parent_type : typ;
         (* Arguments type of the constructor eventually referencing types in 
            parent's data type variables. *)
         args_type : typ list;
         (* Arity of the constructor, i.e. List.length args_type *)
         arity : int;
     }
+
+type data_decl =
+    {
+        name : Ast.ident;
+        data_type : typ;
+    }
+
+module V = struct
+    type t = tvar
+    let compare v1 v2 = Stdlib.compare v1.id v2.id
+    let equal v1 v2 = v1.id = v2.id
+    let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
+end
+
+let unit_type = Ttyp_data ("Unit", [])
+let boolean_type = Ttyp_data ("Boolean", [])
+let int_type = Ttyp_data ("Int", [])
+let string_type = Ttyp_data ("String", [])
+let effect_type = Ttyp_data ("Effect", [Ttyp_variable (V.create ())])

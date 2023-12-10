@@ -4,7 +4,7 @@ exception Semantic_error of (Location.t * Location.t) * string
 
 type 'a located_node =
     {
-        range : Location.t * Location.t;
+        range : Location.range;
         node : 'a;
     }
 

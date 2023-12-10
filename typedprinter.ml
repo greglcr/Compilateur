@@ -11,16 +11,17 @@ let rec pp_typed_node pp_a fmt node =
   fprintf fmt "{@[type = %a;@;node = %a@]}" pp_typ node.typ pp_a node.node
 
 and pp_typ fmt typ = match Typer.head typ with
-  | Ttyp_unit -> fprintf fmt "unit"
-  | Ttyp_boolean -> fprintf fmt "Boolean"
-  | Ttyp_int -> fprintf fmt "Int"
-  | Ttyp_string -> fprintf fmt "String"
-  | Ttyp_effect t -> fprintf fmt "Effect %a " pp_typ t
   | Ttyp_variable tv -> fprintf fmt "t%d" tv.id
   | Ttyp_function (args, ret) ->
       fprintf fmt "(%a) -> %a"
         (pp_list pp_typ) args
         pp_typ ret
+  | Ttyp_data ("Unit", []) -> fprintf fmt "Unit"
+  | Ttyp_data ("Boolean", []) -> fprintf fmt "Boolean"
+  | Ttyp_data ("Int", []) -> fprintf fmt "Int"
+  | Ttyp_data ("String", []) -> fprintf fmt "String"
+  | Ttyp_data ("Effect", [a]) -> fprintf fmt "Effect %a" pp_typ a
+  | Ttyp_data (name, []) -> fprintf fmt "data %s" name
   | Ttyp_data (name, args) ->
       fprintf fmt "data %s %a" name (pp_list pp_typ) args
 

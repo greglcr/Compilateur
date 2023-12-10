@@ -40,6 +40,12 @@ let print_error (range_start, range_end) msg =
     eprintf "\x1b[1;31mError\x1b[0m: %s@." msg;
     exit 1
 
+let print_error_with_hint (range_start, range_end) msg hint =
+    Location.print file range_start range_end;
+    eprintf "\x1b[1;31mError\x1b[0m: %s@." msg;
+    eprintf "\x1b[3mNote: %s\x1b[0m@." hint;
+    exit 1
+
 let show_tokens lb =
     let token = ref (Post_lexer.next_token lb) in
     while !token != EOF do
@@ -77,8 +83,10 @@ let () =
         let range_start = Location.lexeme_start lb in
         let range_end = Location.lexeme_end lb in
         print_error (range_start, range_end) "syntax error"
-    | Typer.Error (range, msg) ->
+    | Typer.Error (range, msg, None) ->
         print_error range msg
+    | Typer.Error (range, msg, Some hint) ->
+        print_error_with_hint range msg hint;
     | Typer.UnificationFailure (t1, t2) ->
         pp_typ Format.std_formatter t1;
         Format.pp_print_newline Format.std_formatter ();
