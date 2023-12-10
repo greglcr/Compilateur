@@ -422,6 +422,12 @@ let rec from_ast_type genv lenv (typ : Ast.typ) = match typ.node with
 
             | None -> error name.range ("unknown type " ^ name.node)
 
+let rec last_element lst =
+    match lst with
+    | [] -> failwith "Empty list has no last element"
+    | [x] -> x
+    | _ :: rest -> last_element rest
+
 let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     if equations = [] then (
         error decl.range ("type declaration of " ^ name.node ^ " should be followed by its definition")
@@ -453,7 +459,7 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
     let pattern_idx = ref None in
     let tequations = List.map (fun eq -> match eq.node with
         | Pdecl_equation (name, patterns, body) ->
-            snd (type_function_equation genv decl (arity, expected_args_type, expected_ret_type) pattern_idx (name, patterns, body))
+            type_function_equation genv decl (arity, expected_args_type, expected_ret_type) pattern_idx (name, patterns, body)
         | _ -> failwith "unexpected"
     ) equations in
 
@@ -471,9 +477,51 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
                     p2 -> e2
                     ...
                     pn -> en *)
+
+    let function_params, function_body =
+        if name.node = "main" then
+            (* We handle the main function a bit specifically by forbidding
+               multiple equations on the main value. *)
+            if List.length tequations <> 1 then
+                error name.range "multiple value declarations exist for main"
+            else [], snd (List.hd tequations)
+        else if Option.is_none !pattern_idx then
+            (* All arguments are variable patterns. This case is easy, we don't need 
+            to convert all equations to a single case expression. If we have
+            multiple equations, we only keep the last one. *)
+            let patterns, body = last_element tequations in
+            List.map (fun (pattern : Typedtree.pattern) -> match pattern.node with
+                | Tpattern_wildcard -> fill_with_dummy_range "", pattern.typ
+                | Tpattern_variable x -> x, pattern.typ
+                | _ -> assert false) patterns, body
+        else
+            let pattern_idx = Option.get !pattern_idx in
+            let pattern_type = List.nth expected_args_type pattern_idx in
+            let pattern_argument = make_node pattern_type Location.dummy_range (Tpattern_variable (dummy_ident)) in
+            let branches = List.map (fun (patterns, expr) -> List.nth patterns pattern_idx, expr) tequations in
+            (* FIXME: one should replace the old parameters references in each 
+               equations to the new parameters of the "compressed function". For example,
+                    f x true = x
+                    f y false = y
+               should be converted to
+                    f x $ = case $ of
+                        true -> x
+                        false -> x
+               and not
+                    f x $ case $ of
+                        true -> x
+                        false -> y !! y does not exist anymore
+
+               However, this does not affect typing but will be problematic later 
+               for compilation. *)
+            [], make_node 
+                expected_ret_type 
+                Location.dummy_range 
+                (Texpr_case ((make_node pattern_type Location.dummy_range (Texpr_variable dummy_ident)), branches))
+    in
     
     let function_type = Ttyp_function (expected_args_type, expected_ret_type) in
-    make_node function_type decl.range (Tdecl_function (name, [], List.hd tequations))
+    make_node function_type decl.range (Tdecl_function (name, function_params, function_body))
 
 (* ========================================================
    Data Typing

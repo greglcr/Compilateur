@@ -70,8 +70,7 @@ let () =
             let typed_f = Typer.file f in
 
             let ppf = Format.std_formatter in
-            pp_list pp_decl ppf typed_f;
-            Format.pp_print_newline ppf ();
+            List.iter (fun decl -> pp_decl ppf decl; Format.pp_print_newline ppf ()) typed_f;
             Format.pp_print_flush ppf ();
 
             if !type_only then exit 0;
