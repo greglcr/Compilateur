@@ -21,21 +21,23 @@ and pp_typ fmt typ = match Typer.head typ with
       fprintf fmt "(%a) -> %a"
         (pp_list pp_typ) args
         pp_typ ret
-
-let rec pp_tvar fmt tv =
-  fprintf fmt "'a%d" tv.id
+  | Ttyp_data (name, args) ->
+      fprintf fmt "data %s %a" name (pp_list pp_typ) args
 
 and pp_decl_kind fmt = function
   | Tdecl_function (name, params, expr) ->
-      fprintf fmt "function %s(%a) = %a"
+      fprintf fmt "FUNC (@[name = %s,@ params = %a,@ body = %a@])"
         name.node
         (pp_list pp_param) params
         pp_expr expr
-  | Tdecl_data (name, types) ->
-      fprintf fmt "data %s = %a" name.node (pp_list pp_typ) types
+  | Tdecl_data (name, constructors) ->
+      fprintf fmt "DATA (@[name = %s,@ constructors = %a@])" name.node (pp_list pp_constructor) constructors
+
+and pp_constructor fmt (name, args) =
+  fprintf fmt "(@[%s,@ %a@])" name.node (pp_list pp_typ) args
 
 and pp_param fmt (name, typ) =
-  fprintf fmt "%s: %a" name pp_typ typ
+  fprintf fmt "%s: %a" name.node pp_typ typ
 
 and pp_constant fmt = function
 | Ast.Cbool b -> fprintf fmt "%B" b
@@ -59,10 +61,10 @@ and pp_binop fmt = function
 | Ast.Bconcat -> fprintf fmt "<>"
 
 and pp_expr fmt expr =
-  pp_typed_node pp_expr_kind fmt expr
+  fprintf fmt "{@[type = %a;@;node = %a@]}" pp_typ expr.typ pp_expr_kind expr.node
 
 and pp_decl fmt decl =
-  pp_typed_node pp_decl_kind fmt decl
+  fprintf fmt "{@[type = %a;@;node = %a@]}" pp_typ decl.typ pp_decl_kind decl.node
 
 and pp_expr_kind fmt = function
   | Texpr_constant c -> fprintf fmt "ECST %a" pp_constant c
@@ -107,7 +109,7 @@ and pp_branch fmt (pattern, expr) =
     pp_expr expr
 
 and pp_pattern fmt pattern =
-  pp_typed_node pp_pattern_kind fmt pattern
+  fprintf fmt "{@[type = %a;@;node = %a@]}" pp_typ pattern.typ pp_pattern_kind pattern.node
 
 and pp_file fmt decls =
   List.iter (fun decl -> (

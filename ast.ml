@@ -19,29 +19,32 @@ and decl_kind =
     (* a function equation *)
     | Pdecl_equation of 
         ident (* function name *)
-        * (pattern list) (* arguments *)
+        * pattern list (* arguments *)
         * expr (* function body *)
     (* a function declaration *)
     | Pdecl_function of
         ident (* function name *)
-        * (ident list) (* quantified variables *)
-        * (typ list) (* class types (constraints) *)
-        * (typ list) (* arguments type *)
+        * ident list (* quantified variables *)
+        * typ list (* class types (constraints) *)
+        * typ list (* arguments type *)
         * typ (* return type *)
     (* a data declaration *)
     | Pdecl_data of 
         ident (* data name *)
-        * (ident list) (* arguments *)
-        * (ident * typ list) list (* constructors *)
+        * ident list (* arguments *)
+        * constructor list (* constructors *)
     (* a class declaration *)
     | Pdecl_class of 
         ident (* class name *)
-        * (ident list) (* arguments *)
-        * (decl list) (* class's declarations (fields) *)
+        * ident list (* arguments *)
+        * decl list (* class's declarations (fields) *)
     (* an instance declaration *)
     | Pdecl_instance of 
         instance (* instance's target *)
-        * (decl list) (* instance's declarations (fields) *)
+        * decl list (* instance's declarations (fields) *)
+
+(* a data constructor *)
+and constructor = ident * typ list
 
 and typ = typ_kind located_node
 and typ_kind =

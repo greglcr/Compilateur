@@ -18,6 +18,8 @@ type global_env =
     {
         functions : (string, function_decl) Hashtbl.t;
         constructors : (string, constructor_decl) Hashtbl.t;
+        data_types : (string, Typedtree.typ) Hashtbl.t;
+        class_types : (string, Typedtree.typ) Hashtbl.t;
     }
 
 (*
@@ -56,9 +58,8 @@ let rec unify t1 t2 = match head t1, head t2 with
         assert (v1.def = None);
         v1.def <- Some t2
     | t1, (Ttyp_variable v2 as t2) -> unify t2 t1
-    | Ttyp_function (pl1, e1), Ttyp_function (pl2, e2) ->
-        unify_params pl1 pl2;
-        unify e1 e2
+    | (Ttyp_data (name1, args1), Ttyp_data (name2, args2)) when name1 = name2 ->
+        unify_params args1 args2
     | t1, t2 -> unification_error t1 t2 
 
 and unify_params p1 p2 = match (p1, p2) with
@@ -113,14 +114,17 @@ let make_sigma tvars args =
                 match next_type.def with 
                     | None -> 
                         let name = Hashtbl.find ht next_type.id in
+                        Printf.printf "First find";
                         Ttyp_variable(Hashtbl.find new_tvars name)
                     | Some(t) ->
                         let newV = V.create () in
                         newV.def <- Some(explore_type t);
                         Ttyp_variable (newV)
             )
-        | _ -> assert false in
-    let new_args = List.map explore_type args in
+        | Ttyp_function (typ_args, typ_return) ->
+            Ttyp_function ((List.map explore_type typ_args), (explore_type typ_return))
+        | Ttyp_data (name, args) -> Ttyp_data (name, List.map explore_type args)
+    in let new_args = List.map explore_type args in
     (new_tvars, new_args)
 
 let is_equalable_type typ =
@@ -194,21 +198,31 @@ let rec type_expr genv lenv e = match e.node with
     | Ast.Pexpr_apply (name, args) -> (
         match Hashtbl.find_opt genv.functions name.node with
         | None -> raise (Error (name.range, "function '" ^ name.node ^ "' not found"))
-        | Some (decl) ->
+        | Some (func_decl) ->
             let targs = List.map (type_expr genv lenv) args in
             let args_type = List.map (fun a -> a.typ) targs in
-            let _, func_args_type = make_sigma decl.tvars (decl.return_type :: decl.args_type) in
-            let v = Ttyp_variable (V.create ()) in
+            let _, func_args_type = make_sigma func_decl.tvars (func_decl.return_type :: func_decl.args_type) in
             (* List.hd func_args_type is the function's return type and
                List.tl func_args_type are the real arguments type. *)
             unify_params (List.tl func_args_type) args_type; (* unify parameters *)
+            let v = Ttyp_variable (V.create ()) in
             unify (List.hd func_args_type) v; (* unify return type *)
             make_node v (Texpr_apply (name, targs))
     )
 
-    | Ast.Pexpr_constructor (name, args) -> 
-        (* TODO *)
-        raise (Error (e.range, "constructors not yet implemented"))
+    | Ast.Pexpr_constructor (name, args) -> (
+        match Hashtbl.find_opt genv.constructors name.node with
+        | None -> raise (Error (name.range, "constructor '" ^ name.node ^ "' not found"))
+        | Some (constructor_decl) ->
+            let targs = List.map (type_expr genv lenv) args in
+            let args_type = List.map (fun a -> a.typ) targs in
+            let data_type = constructor_decl.data_type in
+            let _, constructor_args_type = make_sigma constructor_decl.tvars (data_type :: constructor_decl.args_type) in
+            unify_params (List.tl constructor_args_type) args_type; (* unify parameters *)
+            let v = Ttyp_variable (V.create ()) in
+            unify (List.hd constructor_args_type) v; (* unify return type *)
+            make_node v (Texpr_constructor (name, targs))
+    )
 
     | Ast.Pexpr_if (cond, then_, else_) ->
         let tcond = type_expr genv lenv cond in
@@ -228,19 +242,17 @@ let rec type_expr genv lenv e = match e.node with
         make_node effect_unit (Texpr_do texprs)
 
     | Ast.Pexpr_let (bindings, e) -> (
-        (*
-            We transform a let expression with multiple bindings to nested let
+        (* We transform a let expression with multiple bindings to nested let
             expressions with each a single binding. So the following code:
 
                 let a = e1, b = e2, c = e3 in e
 
             is transformed to:
+
                 let a = e1 in
                     let b = e2 in
                         let c = e3 in
-                            e
-        *)
-
+                            e *)
         match bindings with
             | [] -> type_expr genv lenv e
             | (name, value) :: r ->
@@ -255,28 +267,41 @@ let rec type_expr genv lenv e = match e.node with
     )
 
     | Pexpr_case (cond, branches) ->
-        (* let tcond = type_expr genv lenv value in
-        let tbranches = List.map (type_branch genv lenv) branches in *)
-        failwith "not yet implemented"
+        let v = Ttyp_variable (V.create ()) in
+        let tcond = type_expr genv lenv cond in
+        let tbranches = List.map (fun x -> type_branch genv lenv x) branches in
+        List.iter (fun x -> unify (fst x).typ tcond.typ) tbranches;
+        List.iter (fun x -> unify (snd x).typ v) tbranches;
+        make_node v (Texpr_case (tcond, tbranches))
 
-let type_branch genv lenv (pattern, expr) =
-    failwith "not yet implemented"
+and type_branch genv lenv (pattern, expr) =
+    let lenv, tpattern = type_pattern genv lenv pattern in
+    let texpr = type_expr genv lenv expr in
+    (tpattern, texpr)
+    
+    
 
-let check_arity args expected_arity =
+and check_arity args expected_arity =
     (List.compare_length_with args expected_arity) = 0
 
-let type_pattern genv lenv pattern = match pattern.node with
+and type_pattern genv lenv pattern = match pattern.node with
     | Ast.Ppattern_constant c ->
-        make_node (type_of_constant c) (Tpattern_constant c)
+        lenv, make_node (type_of_constant c) (Tpattern_constant c)
 
     | Ast.Ppattern_variable name ->
-        let typ = Ttyp_variable (V.create ())
-        in make_node typ (Tpattern_variable (name))
+        let typ = Ttyp_variable (V.create ()) in
+        SMap.add name.node typ lenv, make_node typ (Tpattern_variable (name))
 
-    | Ast.Ppattern_constructor (name, patterns) ->
+    | Ast.Ppattern_constructor (name, patterns) -> (
         match Hashtbl.find_opt genv.constructors name.node with
-        | Some (constructor) -> failwith "not yet implemented"
-        | None -> raise (Error (name.range, "unknown constructor '" ^ name.node ^ "'"))
+        | Some (constructor) ->
+            let tpatterns = List.map (type_pattern genv lenv) patterns in
+            let lenv = List.fold_left (fun env1 env2 -> 
+                SMap.union (fun name _ t -> None) env1 env2) SMap.empty (List.map fst tpatterns) in
+            lenv, make_node constructor.data_type (Tpattern_constructor (name, List.map snd tpatterns))
+
+        | None -> raise (Error (name.range, "unknown constructor " ^ name.node))
+    )
 
 let rec find_function (fname : string) (decls : decl list) =
     let range_to_use = ref (Location.dummy, Location.dummy) in
@@ -331,7 +356,7 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
     let lenv = ref SMap.empty in
     (* Then, we check if each pattern is correctly typed. *)
     let typed_patterns = List.map2 (fun pattern expected_type -> (
-        let typed_pattern = type_pattern genv lenv pattern in
+        let _, typed_pattern = type_pattern genv !lenv pattern in
         unify typed_pattern.typ expected_type;
         (match typed_pattern.node with
             | Tpattern_variable v ->
@@ -353,7 +378,7 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
         )) patterns
     *)
 
-let from_ast_type lenv (typ : Ast.typ) = match typ.node with
+let from_ast_type genv lenv (typ : Ast.typ) = match typ.node with
     | Ptyp_variable v -> (
         match Hashtbl.find_opt lenv v with
             | Some t -> t
@@ -365,10 +390,12 @@ let from_ast_type lenv (typ : Ast.typ) = match typ.node with
     | Ptyp_data ({ node = "String" }, []) -> Ttyp_string
 
     | Ptyp_data (name, args) ->
-        failwith "not yet implemented BLAH"
+        match Hashtbl.find_opt genv.data_types name.node with
+            | Some data_type -> data_type
+            | None -> raise (Error (name.range, "unknown constructor '" ^ name.node ^ "'"))
 
 let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
-    Printf.printf "TYPING FUNCTION %s (with %d equations)" name (List.length equations);
+    Printf.printf "TYPING FUNCTION %s (with %d equations)" name.node (List.length equations);
     let tvars, expected_args_type, expected_ret_type = match decl.node with
         | Pdecl_function (_, quantified_vars, _, args_type, ret_type) ->
             let tvars = Hashtbl.create 17 in
@@ -376,17 +403,28 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
                 Hashtbl.add tvars v.node (Ttyp_variable (V.create ()))
             )) quantified_vars;
 
-            tvars, List.map (from_ast_type tvars) args_type, (from_ast_type tvars ret_type)
+            tvars, List.map (from_ast_type genv tvars) args_type, (from_ast_type genv tvars ret_type)
         | _ -> assert false
     in
     let arity = List.length expected_args_type in
+
+    let function_decl = 
+    {
+        name = name.node;
+        tvars;
+        args_type = expected_args_type;
+        return_type = expected_ret_type;
+        arity = List.length expected_args_type
+    } in
+    Hashtbl.add genv.functions name.node function_decl;
+
     (* Check if all function's equations are correctly typed. *)
     let typed_equations = List.map (fun eq -> match eq.node with
         | Pdecl_equation (name, patterns, body) ->
             type_function_equation genv decl (arity, expected_args_type, expected_ret_type) (name, patterns, body)
         | _ -> failwith "unexpected"
-    ) equations
-    in
+    ) equations in
+
     (* And if yes, compress all of them into a single function expression.
        In other words, if we have
             f p1 = e1
@@ -401,14 +439,9 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
                     p2 -> e2
                     ...
                     pn -> en *)
-    {
-        name;
-        tvars;
-        args_type = expected_args_type;
-        return_type = expected_ret_type;
-        arity = List.length expected_args_type;
-        body = (List.hd typed_equations)
-    }
+    
+    let function_type = Ttyp_function (expected_args_type, expected_ret_type) in
+    make_node function_type (Tdecl_function (name, [], List.hd typed_equations))
 
 (*
 let find_in_env genv locenv key =
@@ -423,20 +456,9 @@ let type_data genv lenv decl = match decl with
         List.iter (fun x -> let new_typ = Ttyp_variable (V.create()) in list_typ := new_typ :: (!list_typ); Hashtbl.add loc_env x args)
         Hashtbl.add genv.items name (Tdecl_data (name, !list_typ));
         (*We go through the list of fields in order to declare function that have the argument given and a return type of the data*)
-        let rec add_fields l = match l with
-            | [] -> ()
-            | (name_cons, args) :: r -> Hashtbl.add genv.func name_cons Ttyp_func ( (List.iter (fun x -> find_in_env genv locenv x) args) (find_in_env genv locenv name)) in(*We must return a Ttyp_func (typ list of all the argument given, typ return which is the data type declare just above) *)
-        add_fields fields
-    )
-
-    | _ -> assert false
-
-
-let type_class genv decl = match decl with
-    | Pdecl_class (name, args, decls) -> 
-        let loc_env = Hashtbl.create 17 in
-        List.iter
-            (
+        let rec add_fields l = match l withe
+    | _ -> assert false⟨lident⟩ :: (forall ⟨lident⟩+.)?
+(⟨ntype⟩ =>)⋆ (⟨type⟩ ->)⋆ ⟨type⟩
                 fun x -> 
                 if Hashtbl.mem loc_env x || Hashtbl.mem genv x then raise (Error (dummy_range, "Redclaration of type"))
                 else Hashtbl.add lov_env x (V.create ()) (*Maybe we need to check if the type doesn't already exist, and if it the case raise a typing error*)
@@ -465,45 +487,69 @@ let type_class genv decl = match decl with
     | _ -> assert false*)
 
 
+let type_data_constructor genv lenv tvars data_type (name, args) =
+    let targs = List.map (from_ast_type genv lenv) args in
+
+    Hashtbl.add genv.constructors name.node {
+        name = name.node;
+        tvars;
+        data_type;
+        args_type = targs;
+        arity = List.length args;
+     };
+
+    (name, targs)
+     
+
+let type_data genv name tvars constructors =
+    let lenv = Hashtbl.create 17 in
+    let tvars_type = ref [] in
+    List.iter (fun tvar -> 
+        let t = Ttyp_variable (V.create ()) in
+        Hashtbl.add lenv tvar.node t;
+        tvars_type := t :: !tvars_type
+    ) tvars;
+
+    let data_type = Ttyp_data (name.node, !tvars_type) in
+    Hashtbl.add genv.data_types name.node data_type;
+    
+    let tconstructors = List.map (type_data_constructor genv lenv lenv data_type) constructors in
+    make_node data_type (Tdecl_data (name, tconstructors))
+
 let file decls = 
     let genv = { 
         functions = Hashtbl.create 17;
         constructors = Hashtbl.create 17;
+        data_types = Hashtbl.create 17;
+        class_types = Hashtbl.create 17;
     } in
-    List.iter (fun decl -> (
+    (* Collect all declarations: *)
+    List.fold_left (fun acc decl -> (
         match decl.node with
+            (* Handle functions *)
             | Pdecl_equation (name, _, _)
-            | Pdecl_function (name, _, _, _, _) ->
-                if Option.is_none (Hashtbl.find_opt genv.functions name.node) then
-                    let decl, equations = find_function name.node decls in
-                    let tdecl = type_function genv name.node decl equations in
-                    Hashtbl.add genv.functions name.node tdecl
-                else ()
+            | Pdecl_function (name, _, _, _, _) -> (
+                match Hashtbl.find_opt genv.functions name.node with
+                    | None ->
+                        let decl, equations = find_function name.node decls in
+                        let tdecl = type_function genv name decl equations in
+                        tdecl :: acc
+                    | Some _ ->
+                        (* Ignore it as this declaration was already handled by find_function
+                        at the first time this function's name was encountered. *)
+                        acc
+            )
 
-            | _ -> ()
-    )) decls;
-    List.map (fun decl -> decl.body) (List.of_seq (Hashtbl.to_seq_values genv.functions))
+            (* Handle data types and constructors *)
+            | Pdecl_data (name, tvars, constructors) -> (
+                match Hashtbl.find_opt genv.data_types name.node with
+                    | None -> (type_data genv name tvars constructors) :: acc
+                    
+                    | Some (previous_decl) ->
+                        (* TODO: print the location of the previous declaration. *)
+                        raise (Error (name.range, "redeclaration of data type " ^ name.node))
+            )
 
-(*
-(* Returns a type (of the typed tree) corresponding to the given
-   function declaration. *)
-let type_from_function_decl genv (decl : Ast.decl) =
-    let lenv = Hashtbl.create 17 in
-    match decl.node with
-    | Pdecl_function (_, vars, _, args_typ, return_typ) -> (
-        List.iter (fun x -> Hashtbl.add x (V.create ())) vars;
-        let link_type_param l = match l with
-            | [] -> []
-            | tp :: r -> try (Hashtbl.find lenv tp) :: (link_type_param r)
-                         with Not_found -> (try (Hashtbl.find genv tp) :: (link_type_param r)
-                                            with Not_found -> raise (Error (Location.dummy, Location.dummy), "Type inconnu")) in
-        Ttyp_function ((link_type_param args_typ),
-                        try (Hashtbl.find lenv return_typ)
-                        with Not_found -> (try (Hashtbl.find genv tp)
-                                           with Not_found -> raise (Error (Location.dummy, Location.dummy), "Type inconnu"))
-
-                      )
-    )
-
-    | _ -> assert false
-*)
+            | Pdecl_class (name, _, _) -> failwith "class declarations not yet implemented"
+            | Pdecl_instance (_, _) -> failwith "instance declarations not yet implemented"
+    )) [] decls

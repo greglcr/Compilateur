@@ -8,15 +8,15 @@ open Typedprinter
 
 let usage = "usage: ppurs [options] file.purs"
 
-let lexing_only = ref false
+let lex_only = ref false
 let parse_only = ref false
-let typing_only = ref false
+let type_only = ref false
 
 let spec =
     [
-        "--lexing-only", Arg.Set lexing_only, "  stop after lexing and print all tokens";
+        "--lex-only", Arg.Set lex_only, "  stop after lexing and print all tokens";
         "--parse-only", Arg.Set parse_only, "  stop after parsing";
-        "--typing-only", Arg.Set typing_only, "  stop after typing";
+        "--type-only", Arg.Set type_only, "  stop after typing";
     ]
 
 let file =
@@ -51,7 +51,7 @@ let () =
     let c = open_in file in
     let lb = Lexing.from_channel c in
     try
-        if !lexing_only then (
+        if !lex_only then (
             show_tokens lb
         ) else (
             let f = Parser.file Post_lexer.next_token lb in
@@ -60,11 +60,11 @@ let () =
             let typed_f = Typer.file f in
 
             let ppf = Format.std_formatter in
-            pp_list pp_expr ppf typed_f;
+            pp_list pp_decl ppf typed_f;
             Format.pp_print_newline ppf ();
             Format.pp_print_flush ppf ();
 
-            if !typing_only then exit 0;
+            if !type_only then exit 0;
         )
     with
     | Lexing_error msg ->
@@ -79,3 +79,8 @@ let () =
         print_error (range_start, range_end) "syntax error"
     | Typer.Error (range, msg) ->
         print_error range msg
+    | Typer.UnificationFailure (t1, t2) ->
+        pp_typ Format.std_formatter t1;
+        Format.pp_print_newline Format.std_formatter ();
+        pp_typ Format.std_formatter t2;
+        print_error (Location.dummy, Location.dummy) "unification error";

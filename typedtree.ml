@@ -15,6 +15,8 @@ type typ =
     | Ttyp_variable of tvar
     (* type of a function (constructors are not functions) *)
     | Ttyp_function of typ list * typ
+    (* type of a data declaration *)
+    | Ttyp_data of string * typ list
 
 and tvar = 
     {
@@ -32,11 +34,20 @@ and 'a typed_node =
 
 and decl = decl_kind typed_node
 and decl_kind =
-    | Tdecl_function of Ast.ident * param list * expr
-    | Tdecl_data of Ast.ident * typ list
+    (* a function declaration *)
+    | Tdecl_function of 
+        Ast.ident (* function's name *)
+        * param list (* parameters *)
+        * expr (* function's body *)
+    (* a data declaration *)
+    | Tdecl_data of 
+        Ast.ident (* data's name *)
+        * constructor list (* constructors *)
 
+(* a data constructor *)
+and constructor = Ast.ident * typ list
 (* a function parameter *)
-and param = string * typ
+and param = Ast.ident * typ
 
 and expr = expr_kind typed_node
 and expr_kind =
@@ -49,9 +60,9 @@ and expr_kind =
     (* variable name *)
     | Texpr_variable of Ast.ident
     (* function name, arguments *)
-    | Texpr_apply of Ast.ident * (expr list)
+    | Texpr_apply of Ast.ident * expr list
     (* constructor name, arguments *)
-    | Texpr_constructor of Ast.ident * (expr list)
+    | Texpr_constructor of Ast.ident * expr list
     (* condition expression, then expression, else expression *)
     | Texpr_if of expr * expr * expr
     (* block of multiple expressions *)
@@ -86,14 +97,20 @@ type function_decl =
         args_type : typ list;
         (* Function's return type. *)
         return_type : typ;
-        (* Arity of the function, i.e. List.length args *)
+        (* Arity of the function, i.e. List.length args_type *)
         arity : int;
-        (* The function's body expression. *)
-        body : expr;
     }
 
 type constructor_decl =
     {
         (* The constructor's name. *)
         name : string;
+        (* Quantified type variables (the variables after the forall.). *)
+        tvars : (string, typ) Hashtbl.t;
+        data_type : typ;
+        (* Arguments type of the constructor eventually referencing types in 
+           parent's data type variables. *)
+        args_type : typ list;
+        (* Arity of the constructor, i.e. List.length args_type *)
+        arity : int;
     }
