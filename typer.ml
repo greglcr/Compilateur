@@ -370,6 +370,7 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
         error_with_hint name.range ("incorrect number of arguments for function " ^ name.node) hint
     );
 
+
     let lenv = ref SMap.empty in
     (* Then, we check if each pattern is correctly typed. *)
     let tpatterns = List.map2 (fun pattern expected_type -> (
@@ -575,7 +576,7 @@ let type_data genv name range tvars constructors =
 *)
 
 let type_class_field genv lenv decl = match decl.node with
-    | Pdecl_function (name, tvars, instances, args_type, return_type) -> ()
+    | Pdecl_function (name, tvars, instances, args_type, return_type) ->  assert false
     | _ -> assert false
 
 let type_class genv name range tvars fields =
@@ -609,6 +610,16 @@ let default_genv =
     Hashtbl.add functions "not" (mk_builtin_function (fill_with_dummy_range "not") [boolean_type] boolean_type);
     Hashtbl.add functions "mod" (mk_builtin_function (fill_with_dummy_range "mod") [int_type; int_type] int_type);
     Hashtbl.add functions "log" (mk_builtin_function (fill_with_dummy_range "log") [string_type] effect_unit);
+
+    let b = Ttyp_variable (V.create ()) in
+    let tvars = Hashtbl.create 1 in Hashtbl.add tvars "b" b;
+    Hashtbl.add functions "show" {
+        name = fill_with_dummy_range "show";
+        tvars;
+        args_type = [b];
+        return_type = string_type;
+        arity = 1;
+    };
 
     let a = Ttyp_variable (V.create ()) in
     let tvars = Hashtbl.create 1 in Hashtbl.add tvars "a" a;
