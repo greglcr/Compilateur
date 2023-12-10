@@ -356,8 +356,8 @@ let rec collect_equations (fname : string) (decls : decl list) =
             )
     in loop [] decls
 
-let is_non_variable_pattern = function
-    | Ppattern_variable _ -> false
+let is_non_variable_pattern pattern = match pattern.node with
+    | Ppattern_variable _ -> false (* this also include the wildcard _ *)
     | _ -> true
 
 (* Check if a function's equation is valid. *)
@@ -386,17 +386,21 @@ let type_function_equation genv decl (expected_arity, expected_args_type, expect
     )) patterns expected_args_type in 
     let tbody = type_expr genv !lenv body in
     unify_range tbody.typ expected_ret_type body.range;
-    tpatterns, tbody
 
-    (* TODO:
-        (* We also check that there is at most one non-variable pattern
-        and it is at the same position as the other non-variables patterns
-        in the other equations. *)
-        List.iteri (fun i pattern -> (
-        if is_non_variable_pattern pattern & i <> non_variable_index then
-                raise (Error (pattern.range, "non variable pattern"))
-        )) patterns
-    *)
+    (* We also check that there is at most one non-variable pattern
+       and it is at the same position as the other non-variables patterns
+       in the other equations. *)
+    List.iteri (fun i pattern -> (
+        if is_non_variable_pattern pattern then
+            if Option.is_none !pattern_idx then
+                pattern_idx := Some i
+            else if (Option.get !pattern_idx) <> i then
+                let msg = Printf.sprintf "non variable pattern at the %d-th argument" i in
+                let hint = Printf.sprintf "but a non variable pattern was first encountered at the %d-th argument" (Option.get !pattern_idx) in
+                error_with_hint pattern.range msg hint
+    )) patterns;
+
+    tpatterns, tbody
 
 let rec from_ast_type genv lenv (typ : Ast.typ) = match typ.node with
     | Ptyp_variable v -> (
