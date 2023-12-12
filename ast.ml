@@ -14,7 +14,7 @@ type program = decl list
 (* an identifier with source code location data *)
 and ident = string located_node
 
-and decl = decl_kind located_node
+and decl = { decl_kind: decl_kind; decl_range: Location.range; }
 and decl_kind =
     (* a function equation *)
     | Pdecl_equation of 
@@ -46,7 +46,7 @@ and decl_kind =
 (* a data constructor *)
 and constructor = ident * typ list
 
-and typ = typ_kind located_node
+and typ = { type_kind: typ_kind; type_range: Location.range }
 and typ_kind =
     (* a variable type (in lowercase) *)
     | Ptyp_variable of string
@@ -68,7 +68,7 @@ and constant =
     (* e.g. "unit" *)
     | Cunit
 
-and expr = expr_kind located_node
+and expr = { expr_kind: expr_kind; expr_range: Location.range }
 and expr_kind =
     (* constant *)
     | Pexpr_constant of constant
@@ -94,7 +94,7 @@ and expr_kind =
 (* <lident> = <expr> *)
 and binding = ident * expr
 
-and pattern = pattern_kind located_node
+and pattern = { pattern_kind: pattern_kind; pattern_range: Location.range }
 and pattern_kind =
     (* constant *)
     | Ppattern_constant of constant

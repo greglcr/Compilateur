@@ -10,6 +10,11 @@
             range = (Location.from_lexing_position s, Location.from_lexing_position e);
             node
         }
+
+    let mk_expr range expr_kind = { expr_kind; expr_range = Location.from_lexing_range range }
+    let mk_decl range decl_kind = { decl_kind; decl_range = Location.from_lexing_range range }
+    let mk_type range type_kind = { type_kind; type_range = Location.from_lexing_range range }
+    let mk_pattern range pattern_kind = { pattern_kind; pattern_range = Location.from_lexing_range range }
 %}
 
 (* Keywords *)
@@ -95,7 +100,7 @@ decl:
         { td }
 
     | d = decl_kind
-        { mk_node $loc d }
+        { mk_decl $loc d }
 ;
 
 decl_kind:
@@ -116,7 +121,7 @@ constructor:
 
 defn:
     | name = LIDENT p = patarg* EQ e = expr
-        { mk_node $loc (Pdecl_equation (mk_node $loc(name) name, p, e)) }
+        { mk_decl $loc (Pdecl_equation (mk_node $loc(name) name, p, e)) }
 ;
 
 tdecl:
@@ -125,7 +130,7 @@ tdecl:
         {
             let rev_typs = List.rev typs in
             let last_typ = List.hd (List.rev typs) in
-            mk_node $loc (Pdecl_function 
+            mk_decl $loc (Pdecl_function 
                 (name, gen_vars, [], List.rev (List.tl rev_typs), last_typ))
         }
 ;
@@ -140,10 +145,10 @@ forall:
 
 atype:
     | name = LIDENT
-        { mk_node $loc (Ptyp_variable (name)) }
+        { mk_type $loc (Ptyp_variable (name)) }
 
     | name = UIDENT
-        { mk_node $loc (Ptyp_data (mk_node $loc(name) name, [])) }
+        { mk_type $loc (Ptyp_data (mk_node $loc(name) name, [])) }
 
     | LPAR t = typ RPAR
         { t }
@@ -151,15 +156,15 @@ atype:
 
 ntype:
     | name = uident args = atype*
-        { mk_node $loc (Ptyp_data (name, args)) }
+        { mk_type $loc (Ptyp_data (name, args)) }
 ;
 
 typ:
     | name = LIDENT
-        { mk_node $loc (Ptyp_variable (name)) }
+        { mk_type $loc (Ptyp_variable (name)) }
 
     | name = uident args = typ*
-        { mk_node $loc (Ptyp_data (name, args)) }
+        { mk_type $loc (Ptyp_data (name, args)) }
 
     | LPAR t = typ RPAR
         { t }
@@ -178,13 +183,13 @@ instance:
 
 patarg:
     | c = CST
-        { mk_node $loc (Ppattern_constant (c)) }
+        { mk_pattern $loc (Ppattern_constant (c)) }
 
     | name = lident
-        { mk_node $loc (Ppattern_variable (name)) }
+        { mk_pattern $loc (Ppattern_variable (name)) }
 
     | name = uident
-        { mk_node $loc (Ppattern_constructor (name, [])) }
+        { mk_pattern $loc (Ppattern_constructor (name, [])) }
 
     | LPAR p = pattern RPAR
         { p }
@@ -195,18 +200,18 @@ pattern:
         { p }
 
     | name = uident args = patarg+
-        { mk_node $loc (Ppattern_constructor (name, args)) }
+        { mk_pattern $loc (Ppattern_constructor (name, args)) }
 
 (* atom without location *)
 atom:
     | c = CST
-        { mk_node $loc (Pexpr_constant (c)) }
+        { mk_expr $loc (Pexpr_constant (c)) }
 
     | name = lident
-        { mk_node $loc (Pexpr_variable name) }
+        { mk_expr $loc (Pexpr_variable name) }
 
     | name = uident
-        { mk_node $loc (Pexpr_constructor (name, [])) }
+        { mk_expr $loc (Pexpr_constructor (name, [])) }
 
     | LPAR e = expr RPAR
         { e }
@@ -217,7 +222,7 @@ expr:
         { a }
     
     | e = expr_kind
-        { mk_node $loc e }
+        { mk_expr $loc e }
 
 (* expr without location *)
 expr_kind:

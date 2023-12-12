@@ -26,6 +26,8 @@ let from_lexing_position (p : Lexing.position) =
         colno = p.pos_cnum - p.pos_bol + 1;
     }
 
+let from_lexing_range (s, e) = (from_lexing_position s, from_lexing_position e)
+
 let lexeme_start (lexbuf : Lexing.lexbuf) =
     let p = Lexing.lexeme_start_p lexbuf in
     from_lexing_position p
