@@ -8,8 +8,8 @@ type t = {
 (* A source range [begin, end). *)
 type range = t * t
 
-let dummy = 
-    { 
+let dummy =
+    {
         lineno = 0;
         colno = 0;
     }
@@ -52,22 +52,22 @@ let print (file : string) (s : t) (e : t) =
     let line = if s.lineno > 0 then List.nth_opt lines (s.lineno - 1) else None in
     Printf.eprintf "\x1b[1mFile \"%s\", line %d, characters %d-%d:\x1b[0m\n" file s.lineno s.colno e.colno;
     match line with
-        | Some (line) -> 
-            let line_length = String.length line in
-            let underline = Buffer.create line_length in
-            
-            for i = 0 to s.colno - 2 do
-                Buffer.add_char underline ' '
-            done;
+    | Some (line) ->
+        let line_length = String.length line in
+        let underline = Buffer.create line_length in
 
-            let underline_length = 
-                if s.lineno = e.lineno then e.colno - s.colno - 1
-                else line_length - s.colno
-            in
-            for i = 0 to underline_length do
-                Buffer.add_char underline '^'
-            done;
+        for i = 0 to s.colno - 2 do
+            Buffer.add_char underline ' '
+        done;
 
-            Printf.eprintf " %4d | %s\n        %s\n" s.lineno line (Buffer.contents underline)
+        let underline_length =
+            if s.lineno = e.lineno then e.colno - s.colno - 1
+            else line_length - s.colno
+        in
+        for i = 0 to underline_length do
+            Buffer.add_char underline '^'
+        done;
 
-        | None -> ()
+        Printf.eprintf " %4d | %s\n        %s\n" s.lineno line (Buffer.contents underline)
+
+    | None -> ()

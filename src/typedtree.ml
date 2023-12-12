@@ -1,37 +1,35 @@
 (* Typed tree of MiniPureScript *)
 
 type typ =
-    (* a quantified type variable, to be unified. *)
-    | Ttyp_variable of tvar
-    (* type of a data declaration *)
-    | Ttyp_data of string * typ list
+(* a quantified type variable, to be unified. *)
+| Ttyp_variable of tvar
+(* type of a data declaration *)
+| Ttyp_data of string * typ list
 
-and tvar = 
-    {
-        id : int;
-        mutable def : typ option;
-    }
+and tvar = {
+    id : int;
+    mutable def : typ option;
+}
 
-and 'a typed_node = 
-    {
-        typ : typ;
-        range : Location.range;
-        node : 'a;
-    }
+and 'a typed_node = {
+    typ : typ;
+    range : Location.range;
+    node : 'a;
+}
 
 and decl = decl_kind typed_node
 and decl_kind =
-    (* a function declaration *)
-    | Tdecl_function of 
-        Ast.ident (* function name *)
-        * param list (* parameters *)
-        * expr (* function body *)
-    (* a data declaration *)
-    | Tdecl_data of 
-        Ast.ident (* data name *)
-        * constructor list (* constructors *)
-    | Tdecl_class of
-        Ast.ident (* class name *)
+(* a function declaration *)
+| Tdecl_function of
+    Ast.ident (* function name *)
+    * param list (* parameters *)
+    * expr (* function body *)
+(* a data declaration *)
+| Tdecl_data of
+    Ast.ident (* data name *)
+    * constructor list (* constructors *)
+| Tdecl_class of
+    Ast.ident (* class name *)
 
 (* a data constructor *)
 and constructor = Ast.ident * typ list
@@ -40,40 +38,40 @@ and param = Ast.ident * typ
 
 and expr = expr_kind typed_node
 and expr_kind =
-    (* constant *)
-    | Texpr_constant of Ast.constant
-    (* binary operator, lhs, rhs *)
-    | Texpr_binary of Ast.binop * expr * expr
-    (* Pexpr_neg has no equivalent in the typed tree because it
-       is converted to the equivalent "0 - e" binary expression. *)
-    (* variable name *)
-    | Texpr_variable of Ast.ident
-    (* function name, arguments *)
-    | Texpr_apply of Ast.ident * expr list
-    (* constructor name, arguments *)
-    | Texpr_constructor of Ast.ident * expr list
-    (* condition expression, then expression, else expression *)
-    | Texpr_if of expr * expr * expr
-    (* block of multiple expressions *)
-    | Texpr_do of expr list
-    (* let bindings in expression *)
-    | Texpr_let of binding * expr
-    (* condition expression, the branches *)
-    | Texpr_case of expr * branch list
+(* constant *)
+| Texpr_constant of Ast.constant
+(* binary operator, lhs, rhs *)
+| Texpr_binary of Ast.binop * expr * expr
+(* Pexpr_neg has no equivalent in the typed tree because it
+    is converted to the equivalent "0 - e" binary expression. *)
+(* variable name *)
+| Texpr_variable of Ast.ident
+(* function name, arguments *)
+| Texpr_apply of Ast.ident * expr list
+(* constructor name, arguments *)
+| Texpr_constructor of Ast.ident * expr list
+(* condition expression, then expression, else expression *)
+| Texpr_if of expr * expr * expr
+(* block of multiple expressions *)
+| Texpr_do of expr list
+(* let bindings in expression *)
+| Texpr_let of binding * expr
+(* condition expression, the branches *)
+| Texpr_case of expr * branch list
 
 (* <lident> = <expr> *)
 and binding = Ast.ident * expr
 
 and pattern = pattern_kind typed_node
 and pattern_kind =
-    (* _ *)
-    | Tpattern_wildcard
-    (* e.g. 42 *)
-    | Tpattern_constant of Ast.constant
-    (* e.g. foo *)
-    | Tpattern_variable of Ast.ident
-    (* e.g. Bar 42 *)
-    | Tpattern_constructor of Ast.ident * pattern list
+(* _ *)
+| Tpattern_wildcard
+(* e.g. 42 *)
+| Tpattern_constant of Ast.constant
+(* e.g. foo *)
+| Tpattern_variable of Ast.ident
+(* e.g. Bar 42 *)
+| Tpattern_constructor of Ast.ident * pattern list
 
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
