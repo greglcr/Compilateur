@@ -5,3 +5,8 @@ _build/
 
 ppurs.exe
 ppurs
+
+*.pdf
+
+*.purs
+!test/**/*.purs

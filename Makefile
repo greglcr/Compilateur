@@ -1,22 +1,22 @@
 all: ppurs
 
-ppurs.exe:
-	dune build ppurs.exe
+ppurs:
+	dune build src/ppurs.exe
+	@cp src/ppurs.exe ppurs
 
-ppurs: ppurs.exe
-	cp ppurs.exe ppurs
+test-syntax: ppurs
+	@(cd test && bash test.sh -1 ../ppurs)
 
-syntax: ppurs
-	bash test.sh -1 ./ppurs
+test-typing: ppurs
+	@(cd test && bash test.sh -2 ../ppurs)
 
-typing: ppurs
-	bash test.sh -2 ./ppurs
+test-exec: ppurs
+	@(cd test && bash test.sh -3 ../ppurs)
 
-exec: ppurs
-	bash test.sh -3 ./ppurs
+test: test-syntax test-typing test-exec
 
 clean:
-	rm ppurs
 	dune clean
+	rm -f ppurs
 
 .PHONY: all clean ppurs.exe ppurs syntax

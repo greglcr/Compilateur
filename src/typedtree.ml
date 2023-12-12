@@ -3,8 +3,6 @@
 type typ =
     (* a quantified type variable, to be unified. *)
     | Ttyp_variable of tvar
-    (* type of a function (constructors are not functions) *)
-    | Ttyp_function of typ list * typ
     (* type of a data declaration *)
     | Ttyp_data of string * typ list
 
@@ -80,48 +78,34 @@ and pattern_kind =
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
 
-type function_decl =
-    {
-        (* The function's name. *)
-        name : Ast.ident;
-        (* Quantified type variables (the variables after the forall.). *)
-        tvars : (string, typ) Hashtbl.t;
-        (* Arguments type of the function eventually referencing types in tvars. *)
-        args_type : typ list;
-        (* Function's return type. *)
-        return_type : typ;
-        (* Arity of the function, i.e. List.length args_type *)
-        arity : int;
-    }
+type function_decl = {
+    func_name : Ast.ident; (* function's name *)
+    params : typ list; (* parameters types *)
+    arity : int; (* number of parameters *)
+    tvars : (string, typ) Hashtbl.t; (* type variables of the function *)
+    retty : typ; (* return type of the function *)
+}
 
-type constructor_decl =
-    {
-        (* The constructor's name. *)
-        name : Ast.ident;
-        (* Quantified type variables (the variables after the forall.). *)
-        tvars : (string, typ) Hashtbl.t;
-        parent_type : typ;
-        (* Arguments type of the constructor eventually referencing types in 
-           parent's data type variables. *)
-        args_type : typ list;
-        (* Arity of the constructor, i.e. List.length args_type *)
-        arity : int;
-    }
+and data_decl = {
+    data_name : Ast.ident; (* data's name *)
+    constructors : constructor_decl list ; (* list of constructors *)
+    tvars : (string, typ) Hashtbl.t; (* type variables of the data *)
+    arity : int; (* number of type variables *)
+    data_typ : typ; (* type of this data *)
+}
 
-type data_decl =
-    {
-        name : Ast.ident;
-        data_type : typ;
-        (* Arity of the data type, that is the count of type arguments. *)
-        arity : int;
-    }
+and constructor_decl = {
+    cons_name : Ast.ident; (* constructor's name *)
+    data_decl : data_decl; (* the data to whom this constructor is attached *)
+    args : typ list; (* expected arguments types *)
+    arity : int; (* number of arguments *)
+}
 
-type class_decl =
-    {
-        name : Ast.ident;
-        (* Arity of the class type, that is the count of type arguments. *)
-        arity : int;
-    }
+type class_decl = {
+    class_name : Ast.ident; (* class's name *)
+    tvars : (string, typ) Hashtbl.t; (* type variables of the class *)
+    arity : int; (* number of type variables *)
+}
 
 module V = struct
     type t = tvar

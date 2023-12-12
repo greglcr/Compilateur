@@ -12,10 +12,6 @@ let rec pp_typed_node pp_a fmt node =
 
 and pp_typ fmt typ = match Typer.head typ with
   | Ttyp_variable tv -> fprintf fmt "t%d" tv.id
-  | Ttyp_function (args, ret) ->
-      fprintf fmt "(%a) -> %a"
-        (pp_list pp_typ) args
-        pp_typ ret
   | Ttyp_data ("Unit", []) -> fprintf fmt "Unit"
   | Ttyp_data ("Boolean", []) -> fprintf fmt "Boolean"
   | Ttyp_data ("Int", []) -> fprintf fmt "Int"

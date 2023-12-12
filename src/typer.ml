@@ -54,7 +54,7 @@ and unify_params p1 p2 = match (p1, p2) with
     | [], [] -> ()
     | t1::r1, t2::r2 -> unify t1 t2; unify_params r1 r2
     | [], _
-    | _, [] -> failwith "not the same number of parameters"
+    | _, [] -> failwith "arity was already checked"
 
 let rec pp_list pp_v fmt = function
     | [] -> ()
@@ -91,7 +91,7 @@ let type_of_constant c = match c with
 
 let effect_unit = Ttyp_data ("Effect", [unit_type])
 
-let make_node typ range node = { typ; range; node }
+let mk_node typ range node = { typ; range; node }
 
 let make_sigma tvars args =
     (*tvars = list of variable typ*)
@@ -115,8 +115,6 @@ let make_sigma tvars args =
                         newV.def <- Some(explore_type t);
                         Ttyp_variable (newV)
             )
-        | Ttyp_function (typ_args, typ_return) ->
-            Ttyp_function ((List.map explore_type typ_args), (explore_type typ_return))
         | Ttyp_data (name, args) -> Ttyp_data (name, List.map explore_type args)
     in let new_args = List.map explore_type args in
     (new_tvars, new_args)
@@ -132,7 +130,7 @@ let is_equalable_type typ =
     t = boolean_type || t = int_type || t = string_type
 
 let rec type_expr genv lenv e = match e.expr_kind with
-    | Ast.Pexpr_constant c -> make_node (type_of_constant c) e.expr_range (Texpr_constant c)
+    | Ast.Pexpr_constant c -> mk_node (type_of_constant c) e.expr_range (Texpr_constant c)
 
     | Ast.Pexpr_binary (op, lhs, rhs) ->
         let tlhs = type_expr genv lenv lhs in
@@ -162,7 +160,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
                 unify_range tlhs.typ boolean_type tlhs.range;
                 unify_range trhs.typ boolean_type trhs.range;
                 boolean_type
-        in make_node t e.expr_range (Texpr_binary (op, tlhs, trhs))
+        in mk_node t e.expr_range (Texpr_binary (op, tlhs, trhs))
 
     | Ast.Pexpr_neg (expr) ->
         (* We transform "-e" to the equivalent code "0 - e". *)
@@ -185,7 +183,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
 
     | Ast.Pexpr_variable name -> (
         match SMap.find_opt name.node lenv with
-            | Some typ -> make_node typ e.expr_range (Texpr_variable name)
+            | Some typ -> mk_node typ e.expr_range (Texpr_variable name)
             | None ->
                 (* We handle the variable "unit" differently because it is a
                    special name for a constant of type unit. But unlike true
@@ -194,7 +192,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
                 if name.node <> "unit" then
                     error e.expr_range ("unknown value " ^ name.node)
                 else
-                    make_node unit_type e.expr_range (Texpr_constant (Cunit))
+                    mk_node unit_type e.expr_range (Texpr_constant (Cunit))
     )
 
     | Ast.Pexpr_apply (name, args) -> (
@@ -204,7 +202,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
             (* Check the count of arguments. *)
             let args_count = List.length args in
             if args_count <> func_decl.arity then (
-                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst func_decl.name.range).lineno in
+                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst func_decl.func_name.range).lineno in
                 let msg = Printf.sprintf 
                     "function %s expected %d argument(s), but got %d argument(s)" 
                     name.node 
@@ -213,14 +211,14 @@ let rec type_expr genv lenv e = match e.expr_kind with
                 in error_with_hint name.range msg hint);
 
             let targs = List.map (type_expr genv lenv) args in
-            let _, func_args_type = make_sigma func_decl.tvars (func_decl.return_type :: func_decl.args_type) in
+            let _, func_args_type = make_sigma func_decl.tvars (func_decl.retty :: func_decl.params) in
             (* List.hd func_args_type is the function's return type and
                List.tl func_args_type are the function's arguments type. *)
             (* unify parameters *)
             List.iter2 (fun targ expected_ty -> unify_range targ.typ expected_ty targ.range) targs (List.tl func_args_type);
             let return_type = Ttyp_variable (V.create ()) in
             unify_range (List.hd func_args_type) return_type e.expr_range; (* unify return type *)
-            make_node return_type e.expr_range (Texpr_apply (name, targs))
+            mk_node return_type e.expr_range (Texpr_apply (name, targs))
     )
 
     | Ast.Pexpr_constructor (name, args) -> (
@@ -228,27 +226,27 @@ let rec type_expr genv lenv e = match e.expr_kind with
            function apply expression. *)
         match Hashtbl.find_opt genv.constructors name.node with
         | None -> error name.range ("unknown data constructor " ^ name.node)
-        | Some (constructor_decl) ->
+        | Some (cons_decl) ->
             let args_count = List.length args in
-            if args_count <> constructor_decl.arity then (
-                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst constructor_decl.name.range).lineno in
+            if args_count <> cons_decl.arity then (
+                let hint = Printf.sprintf "see %s type declaration at line %d" name.node (fst cons_decl.cons_name.range).lineno in
                 let msg = Printf.sprintf 
                     "constructor %s expected %d argument(s), but got %d argument(s)" 
                     name.node 
-                    constructor_decl.arity 
+                    cons_decl.arity 
                     args_count
                 in error_with_hint name.range msg hint);
 
             let targs = List.map (type_expr genv lenv) args in
-            let data_type = constructor_decl.parent_type in
-            let _, constructor_args_type = make_sigma constructor_decl.tvars (data_type :: constructor_decl.args_type) in
-            (* List.hd constructor_args_type is the constructor's return type and
-               List.tl constructor_args_type are the constructor's arguments type. *)
+            let data_type = cons_decl.data_decl.data_typ in
+            let _, cons_args_type = make_sigma cons_decl.data_decl.tvars (data_type :: cons_decl.args) in
+            (* List.hd cons_args_type is the constructor's return type and
+               List.tl cons_args_type are the constructor's arguments type. *)
             (* unify parameters *)
-            List.iter2 (fun targ expected_ty -> unify_range targ.typ expected_ty targ.range) targs (List.tl constructor_args_type);
+            List.iter2 (fun targ expected_ty -> unify_range targ.typ expected_ty targ.range) targs (List.tl cons_args_type);
             let return_type = Ttyp_variable (V.create ()) in
-            unify_range (List.hd constructor_args_type) return_type e.expr_range; (* unify return type *)
-            make_node return_type e.expr_range (Texpr_constructor (name, targs))
+            unify_range (List.hd cons_args_type) return_type e.expr_range; (* unify return type *)
+            mk_node return_type e.expr_range (Texpr_constructor (name, targs))
     )
 
     | Ast.Pexpr_if (cond, then_, else_) ->
@@ -257,7 +255,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
         let telse = type_expr genv lenv else_ in
         unify_range tcond.typ boolean_type tcond.range;
         unify_range tthen.typ telse.typ tthen.range;
-        make_node tthen.typ e.expr_range (Texpr_if (tcond, tthen, telse))
+        mk_node tthen.typ e.expr_range (Texpr_if (tcond, tthen, telse))
 
     | Ast.Pexpr_do exprs ->
         let texprs = List.map (fun (e : Ast.expr) ->
@@ -266,7 +264,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
             te
         ) exprs in
         List.iter (fun t -> unify_range t.typ effect_unit t.range) texprs;
-        make_node effect_unit e.expr_range (Texpr_do texprs)
+        mk_node effect_unit e.expr_range (Texpr_do texprs)
 
     | Ast.Pexpr_let (bindings, e) -> (
         (* We transform a let expression with multiple bindings to nested let
@@ -290,7 +288,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
                         expr_range = e.expr_range;
                         expr_kind = (Ast.Pexpr_let (r, e));
                     }
-                in make_node texpr.typ e.expr_range (Texpr_let ((name, tvalue), texpr))
+                in mk_node texpr.typ e.expr_range (Texpr_let ((name, tvalue), texpr))
     )
 
     | Pexpr_case (cond, branches) ->
@@ -301,7 +299,7 @@ let rec type_expr genv lenv e = match e.expr_kind with
         List.iter (fun x -> let p = fst x in unify_range p.typ tcond.typ p.range) tbranches;
         (* Then, check if all branches expressions have the same type. *)
         List.iter (fun x -> let e = snd x in unify_range e.typ v e.range) tbranches;
-        make_node v e.expr_range (Texpr_case (tcond, tbranches))
+        mk_node v e.expr_range (Texpr_case (tcond, tbranches))
 
 and type_branch genv lenv (pattern, expr) =
     let lenv, tpattern = type_pattern genv lenv pattern in
@@ -313,23 +311,23 @@ and check_arity args expected_arity =
 
 and type_pattern genv lenv pattern = match pattern.pattern_kind with
     | Ast.Ppattern_constant c ->
-        lenv, make_node (type_of_constant c) pattern.pattern_range (Tpattern_constant c)
+        lenv, mk_node (type_of_constant c) pattern.pattern_range (Tpattern_constant c)
 
     | Ast.Ppattern_variable { node = "_" } ->
         let typ = Ttyp_variable (V.create ()) in
-        lenv, make_node typ pattern.pattern_range Tpattern_wildcard
+        lenv, mk_node typ pattern.pattern_range Tpattern_wildcard
 
     | Ast.Ppattern_variable name ->
         let typ = Ttyp_variable (V.create ()) in
-        SMap.add name.node typ lenv, make_node typ pattern.pattern_range (Tpattern_variable (name))
+        SMap.add name.node typ lenv, mk_node typ pattern.pattern_range (Tpattern_variable (name))
 
     | Ast.Ppattern_constructor (name, patterns) -> (
         match Hashtbl.find_opt genv.constructors name.node with
-        | Some (constructor) ->
+        | Some (cons_decl) ->
             let tpatterns = List.map (type_pattern genv lenv) patterns in
             let lenv = List.fold_left (fun env1 env2 -> 
                 SMap.union (fun name _ t -> None) env1 env2) SMap.empty (List.map fst tpatterns) in
-            lenv, make_node constructor.parent_type pattern.pattern_range (Tpattern_constructor (name, List.map snd tpatterns))
+            lenv, mk_node cons_decl.data_decl.data_typ pattern.pattern_range (Tpattern_constructor (name, List.map snd tpatterns))
 
         | None -> error name.range ("unknown data constructor " ^ name.node)
     )
@@ -448,10 +446,10 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
 
     let function_decl = 
     {
-        name = name;
+        func_name = name;
         tvars;
-        args_type = expected_args_type;
-        return_type = expected_ret_type;
+        params = expected_args_type;
+        retty = expected_ret_type;
         arity = List.length expected_args_type
     } in
     Hashtbl.add genv.functions name.node function_decl;
@@ -498,7 +496,7 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
         else
             let pattern_idx = Option.get !pattern_idx in
             let pattern_type = List.nth expected_args_type pattern_idx in
-            let pattern_argument = make_node pattern_type Location.dummy_range (Tpattern_variable (dummy_ident)) in
+            let pattern_argument = mk_node pattern_type Location.dummy_range (Tpattern_variable (dummy_ident)) in
             let branches = List.map (fun (patterns, expr) -> List.nth patterns pattern_idx, expr) tequations in
             (* FIXME: one should replace the old parameters references in each 
                equations to the new parameters of the "compressed function". For example,
@@ -515,35 +513,35 @@ let type_function genv name (decl : Ast.decl) (equations : Ast.decl list) =
 
                However, this does not affect typing but will be problematic later 
                for compilation. *)
-            [], make_node 
+            [], mk_node 
                 expected_ret_type 
                 Location.dummy_range 
-                (Texpr_case ((make_node pattern_type Location.dummy_range (Texpr_variable dummy_ident)), branches))
+                (Texpr_case ((mk_node pattern_type Location.dummy_range (Texpr_variable dummy_ident)), branches))
     in
     
-    let function_type = Ttyp_function (expected_args_type, expected_ret_type) in
-    make_node function_type decl.decl_range (Tdecl_function (name, function_params, function_body))
+    (* FIXME: remove function_type *)
+    let function_type = Ttyp_data ("", []) in
+    mk_node function_type decl.decl_range (Tdecl_function (name, function_params, function_body))
 
 (* ========================================================
    Data Typing
 *)
 
-let type_data_constructor genv lenv parent_type (name, args) =
+let type_data_constructor genv lenv data_decl (name, args) =
     let targs = List.map (from_ast_type genv lenv) args in
 
     match Hashtbl.find_opt genv.constructors name.node with
         | None ->
             Hashtbl.add genv.constructors name.node {
-                name = name;
-                tvars = lenv;
-                parent_type;
-                args_type = targs;
+                cons_name = name;
+                data_decl;
+                args = targs;
                 arity = List.length args;
             };
             (name, targs)
 
         | Some previous_decl ->
-            let previous_decl_line = (fst previous_decl.name.range).lineno in
+            let previous_decl_line = (fst previous_decl.cons_name.range).lineno in
             let hint = Format.sprintf "data constructor %s was declared before at line %d" name.node previous_decl_line in
             error_with_hint name.range ("redeclaration of data constructor " ^ name.node) hint
 
@@ -562,14 +560,15 @@ let make_lenv_from_tvars tvars =
     ) tvars;
     lenv, tvars_type
 
-let type_data genv name range tvars constructors =
+let type_data genv data_name range tvars constructors =
     let lenv, tvars_type = make_lenv_from_tvars tvars in
 
-    let data_type = Ttyp_data (name.node, !tvars_type) in
-    Hashtbl.add genv.data_types name.node { name; data_type; arity = List.length tvars };
+    let data_typ = Ttyp_data (data_name.node, !tvars_type) in
+    let data_decl = { data_name; constructors = []; tvars = lenv; arity = List.length tvars; data_typ } in
+    Hashtbl.add genv.data_types data_name.node data_decl;
     
-    let tconstructors = List.map (type_data_constructor genv lenv data_type) constructors in
-    make_node data_type range (Tdecl_data (name, tconstructors))
+    let tconstructors = List.map (type_data_constructor genv lenv data_decl) constructors in
+    mk_node data_typ range (Tdecl_data (data_name, tconstructors))
 
 (* ========================================================
    Class Typing
@@ -583,16 +582,21 @@ let type_class genv name range tvars fields =
     let lenv, tvars_type = make_lenv_from_tvars tvars in
 
     let tfields = List.map (type_class_field genv lenv) fields in
-    make_node unit_type range (Tdecl_class name)
+    mk_node unit_type range (Tdecl_class name)
 
-let mk_builtin_function name args_type return_type =
-    {
-        name;
-        tvars = Hashtbl.create 0;
-        args_type;
-        return_type;
-        arity = List.length args_type;
-    }
+let mk_builtin_function name params retty =
+    { func_name = fill_with_dummy_range name;
+      tvars = Hashtbl.create 0;
+      params;
+      retty;
+      arity = List.length params; }
+
+let mk_builtin_data_ty name ty arity =
+    { data_name = fill_with_dummy_range name; 
+      data_typ = ty; 
+      arity; 
+      constructors = []; 
+      tvars = Hashtbl.create 0 }
 
 let default_genv =
     let functions = Hashtbl.create 17 in
@@ -600,34 +604,34 @@ let default_genv =
     let data_types = Hashtbl.create 17 in
     let class_types = Hashtbl.create 17 in
 
-    Hashtbl.add data_types "Unit" { name = fill_with_dummy_range "Unit"; data_type = unit_type; arity = 0 };
-    Hashtbl.add data_types "Boolean" { name = fill_with_dummy_range "Boolean"; data_type = boolean_type; arity = 0 };
-    Hashtbl.add data_types "Int" { name = fill_with_dummy_range "Int"; data_type = int_type; arity = 0 };
-    Hashtbl.add data_types "String" { name = fill_with_dummy_range "String"; data_type = string_type; arity = 0 };
-    Hashtbl.add data_types "Effect" { name = fill_with_dummy_range "Effect"; data_type = effect_unit; arity = 1 };
+    Hashtbl.add data_types "Unit" (mk_builtin_data_ty "Unit" unit_type 0);
+    Hashtbl.add data_types "Boolean" (mk_builtin_data_ty "Boolean" boolean_type 0);
+    Hashtbl.add data_types "Int" (mk_builtin_data_ty "Int" int_type 0);
+    Hashtbl.add data_types "String" (mk_builtin_data_ty "String" string_type 0);
+    Hashtbl.add data_types "Effect" (mk_builtin_data_ty "Effect" effect_type 1);
 
     (* the constant unit is handled separately in type_expr *)
-    Hashtbl.add functions "not" (mk_builtin_function (fill_with_dummy_range "not") [boolean_type] boolean_type);
-    Hashtbl.add functions "mod" (mk_builtin_function (fill_with_dummy_range "mod") [int_type; int_type] int_type);
-    Hashtbl.add functions "log" (mk_builtin_function (fill_with_dummy_range "log") [string_type] effect_unit);
+    Hashtbl.add functions "not" (mk_builtin_function "not" [boolean_type] boolean_type);
+    Hashtbl.add functions "mod" (mk_builtin_function "mod" [int_type; int_type] int_type);
+    Hashtbl.add functions "log" (mk_builtin_function "log" [string_type] effect_unit);
 
     let b = Ttyp_variable (V.create ()) in
     let tvars = Hashtbl.create 1 in Hashtbl.add tvars "b" b;
     Hashtbl.add functions "show" {
-        name = fill_with_dummy_range "show";
+        func_name = fill_with_dummy_range "show";
         tvars;
-        args_type = [b];
-        return_type = string_type;
+        params = [b];
+        retty = string_type;
         arity = 1;
     };
 
     let a = Ttyp_variable (V.create ()) in
     let tvars = Hashtbl.create 1 in Hashtbl.add tvars "a" a;
     Hashtbl.add functions "pure" {
-        name = fill_with_dummy_range "pure";
+        func_name = fill_with_dummy_range "pure";
         tvars;
-        args_type = [a];
-        return_type = (Ttyp_data ("Effect", [a]));
+        params = [a];
+        retty = (Ttyp_data ("Effect", [a]));
         arity = 1;
     };
 
@@ -655,7 +659,7 @@ let file decls =
                             let tdecl = type_function genv name decl equations in
                             loop (tdecl :: acc) next_decls
                         | Some previous_decl ->
-                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let previous_decl_line = (fst previous_decl.func_name.range).lineno in
                             let hint = Format.sprintf "previous declaration of value %s is at line %d" name.node previous_decl_line in
                             error_with_hint name.range ("redeclaration of value " ^ name.node) hint
                 )
@@ -664,7 +668,7 @@ let file decls =
                     match Hashtbl.find_opt genv.data_types name.node with
                         | None -> loop ((type_data genv name decl.decl_range tvars constructors) :: acc) r
                         | Some previous_decl ->
-                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let previous_decl_line = (fst previous_decl.data_name.range).lineno in
                             let hint = Format.sprintf "previous declaration of data type %s is at line %d" name.node previous_decl_line in
                             error_with_hint name.range ("redeclaration of data type " ^ name.node) hint
                 )
@@ -673,7 +677,7 @@ let file decls =
                     match Hashtbl.find_opt genv.class_types name.node with
                         | None -> loop ((type_class genv name decl.decl_range tvars fields) :: acc) r
                         | Some previous_decl ->
-                            let previous_decl_line = (fst previous_decl.name.range).lineno in
+                            let previous_decl_line = (fst previous_decl.class_name.range).lineno in
                             let hint = Format.sprintf "previous declaration of class type %s is at line %d" name.node previous_decl_line in
                             error_with_hint name.range ("redeclaration of class type " ^ name.node) hint
                 )
