@@ -54,11 +54,11 @@
 
 
 file:
-    | MODULE name = uident WHERE LBRACE 
+    | MODULE name = uident WHERE LBRACE
         imports = imports
-        decls = separated_nonempty_list(SEMI, decl) 
+        decls = separated_nonempty_list(SEMI, decl)
       RBRACE EOF
-        { 
+        {
             let dummy_range = Location.dummy, Location.dummy in
             if not (Imports.mem "Prelude" imports) then
                 raise (Semantic_error (dummy_range, "missing 'import Prelude'"));
@@ -130,7 +130,7 @@ tdecl:
         {
             let rev_typs = List.rev typs in
             let last_typ = List.hd (List.rev typs) in
-            mk_decl $loc (Pdecl_function 
+            mk_decl $loc (Pdecl_function
                 (name, gen_vars, [], List.rev (List.tl rev_typs), last_typ))
         }
 ;
@@ -220,7 +220,7 @@ atom:
 expr:
     | a = atom
         { a }
-    
+
     | e = expr_kind
         { mk_expr $loc e }
 

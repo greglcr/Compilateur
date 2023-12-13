@@ -16,79 +16,71 @@ type marker = B of int | M
  and therefore this function does nothing.
 *)
 let rec close weak stack pending_tokens c =
-    if (Stack.is_empty stack) || weak then ()
-    else
-        match Stack.top stack with
-        | B n when n > c -> ignore (Stack.pop stack);
-                            Queue.add RBRACE pending_tokens;
-                            close weak stack pending_tokens c
-        | B n when n = c -> Queue.add SEMI pending_tokens
-        | _ -> ()
+  if Stack.is_empty stack || weak then ()
+  else
+    match Stack.top stack with
+    | B n when n > c ->
+        ignore (Stack.pop stack);
+        Queue.add RBRACE pending_tokens;
+        close weak stack pending_tokens c
+    | B n when n = c -> Queue.add SEMI pending_tokens
+    | _ -> ()
 
 let rec pop_until_m stack pending_tokens =
-    if not (Stack.is_empty stack) then
-        match Stack.pop stack with
-        | B _ -> Queue.add RBRACE pending_tokens;
-                    pop_until_m stack pending_tokens
-        | M -> ()
+  if not (Stack.is_empty stack) then
+    match Stack.pop stack with
+    | B _ ->
+        Queue.add RBRACE pending_tokens;
+        pop_until_m stack pending_tokens
+    | M -> ()
 
 let token_column token lexbuf =
-    if token = EOF then -1
-    else (
-        let pos = (lexeme_start_p lexbuf) in
-        pos.pos_cnum - pos.pos_bol
-    )
+  if token = EOF then -1
+  else
+    let pos = lexeme_start_p lexbuf in
+    pos.pos_cnum - pos.pos_bol
 
 let next_token =
-    let pending_tokens = Queue.create () in
-    let stack = Stack.create () in
-    function lexbuf ->
-        (* If we have pending tokens then return them *)
-        if not (Queue.is_empty pending_tokens) then (
-            Queue.take pending_tokens
-        ) else ( (* Otherwise, continue lexing from the source code *)
-            let rec aux weak token c =
-                match token with
-                | IF | LPAR | CASE -> (
-                    close weak stack pending_tokens c;
-                    Stack.push M stack;
-                    Queue.add token pending_tokens
-                )
+  let pending_tokens = Queue.create () in
+  let stack = Stack.create () in
+  function
+  | lexbuf ->
+      (* If we have pending tokens then return them *)
+      if not (Queue.is_empty pending_tokens) then Queue.take pending_tokens
+      else
+        (* Otherwise, continue lexing from the source code *)
+        let rec aux weak token c =
+          match token with
+          | IF | LPAR | CASE ->
+              close weak stack pending_tokens c;
+              Stack.push M stack;
+              Queue.add token pending_tokens
+          | RPAR | ELSE | THEN | IN ->
+              pop_until_m stack pending_tokens;
 
-                | RPAR | ELSE | THEN | IN -> (
-                    pop_until_m stack pending_tokens;
+              if token = THEN then Stack.push M stack;
 
-                    if token = THEN then
-                        (Stack.push M stack);
+              Queue.add token pending_tokens
+          | WHERE | DO | LET | OF ->
+              close weak stack pending_tokens c;
 
-                    Queue.add token pending_tokens
-                )
+              if token = LET then Stack.push M stack
+              else if token = OF then pop_until_m stack pending_tokens;
 
-                | WHERE | DO | LET | OF -> (
-                    close weak stack pending_tokens c;
+              Queue.add token pending_tokens;
+              Queue.add LBRACE pending_tokens;
 
-                    if token = LET then
-                        Stack.push M stack
-                    else if token = OF then
-                        pop_until_m stack pending_tokens;
+              let token' = Lexer.next_token lexbuf in
+              let c' = token_column token' lexbuf in
+              close weak stack pending_tokens c';
+              Stack.push (B c') stack;
+              aux true token' c'
+          | _ ->
+              close weak stack pending_tokens c;
+              Queue.add token pending_tokens
+        in
 
-                    Queue.add token pending_tokens;
-                    Queue.add LBRACE pending_tokens;
-
-                    let token' = Lexer.next_token lexbuf in
-                    let c' = token_column token' lexbuf in
-                    close weak stack pending_tokens c';
-                    Stack.push (B c') stack;
-                    aux true token' c'
-                )
-
-                | _ -> (
-                    close weak stack pending_tokens c;
-                    Queue.add token pending_tokens
-                ) in
-
-            let token = Lexer.next_token lexbuf in
-            let c = token_column token lexbuf in
-            aux false token c;
-            Queue.take pending_tokens
-        )
+        let token = Lexer.next_token lexbuf in
+        let c = token_column token lexbuf in
+        aux false token c;
+        Queue.take pending_tokens

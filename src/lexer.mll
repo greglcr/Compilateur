@@ -61,10 +61,10 @@ rule next_token = parse
     | integer as s
         { try (CST (Cint (int_of_string s)))
           with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
-    
+
     | lident as l
         { resolve_keyword l }
-    
+
     | uident as u
         { UIDENT (u) }
 
@@ -118,7 +118,7 @@ rule next_token = parse
 
     | "=>"
         { FAT_ARROW }
-        
+
     | "("
         { LPAR }
 
@@ -136,13 +136,13 @@ rule next_token = parse
 
     | "::"
         { COLON_COLON }
-    
+
     | ","
         { COMMA }
-    
+
     | "."
         { DOT }
-    
+
     | "|"
         { PIPE }
 
@@ -168,7 +168,7 @@ and block_comment = parse
 
     | "-}"
         { next_token lexbuf }
-    
+
     | eof
         { raise (Lexing_error ("unterminated comment")) }
 
