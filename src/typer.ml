@@ -69,6 +69,17 @@ let rec pp_type fmt typ =
   | Ttyp_data (name, tvars) ->
       Format.fprintf fmt "%s @[%a@]" name (pp_list pp_type) tvars
 
+let pp_func_decl_forall fmt tvars =
+  if Hashtbl.length tvars > 0 then (
+    Format.fprintf fmt " forall";
+    Hashtbl.iter (fun _ t -> Format.fprintf fmt " %a" pp_type t) tvars;
+    Format.fprintf fmt ".")
+
+let pp_func_decl fmt func_decl =
+  Format.fprintf fmt "%s ::%a %a -> %a" func_decl.func_name.node
+    pp_func_decl_forall func_decl.tvars (pp_list pp_type) func_decl.params
+    pp_type func_decl.retty
+
 (* Utility function around unify to emit a proper error in case
    of unification failure with the given source location. *)
 let unify_range t1 t2 range =
@@ -258,7 +269,8 @@ let rec type_expr genv lenv e =
           let targs = List.map (type_expr genv lenv) args in
           let data_type = cons_decl.data_decl.data_typ in
           let _, cons_args_type =
-            make_sigma cons_decl.data_decl.tvars (data_type :: cons_decl.args)
+            make_sigma cons_decl.data_decl.data_tvars
+              (data_type :: cons_decl.args)
           in
           (* List.hd cons_args_type is the constructor's return type and
              List.tl cons_args_type are the constructor's arguments type. *)
@@ -473,11 +485,12 @@ let rec from_ast_type genv lenv (typ : Ast.typ) =
       | None -> error typ.type_range ("type variable " ^ v ^ " is undefined"))
   | Ptyp_data (name, args) -> (
       match Hashtbl.find_opt genv.data_decls name.node with
-      | Some { arity } ->
+      | Some { data_arity } ->
           let args_count = List.length args in
-          (if args_count <> arity then
+          (if args_count <> data_arity then
              let hint =
-               Format.asprintf "got %d, but %d is required" args_count arity
+               Format.asprintf "got %d, but %d is required" args_count
+                 data_arity
              in
              error_with_hint name.range
                ("incorrect number of type variables for data " ^ name.node)
@@ -631,29 +644,31 @@ let type_data_constructor genv lenv data_decl (name, args) =
         ("redeclaration of data constructor " ^ name.node)
         hint
 
+let mk_data_decl data_name data_tvars data_typ =
+  {
+    data_name;
+    constructors = [];
+    data_tvars;
+    data_typ;
+    data_arity = Hashtbl.length data_tvars;
+  }
+
 let type_data genv data_name range tvars constructors =
   let lenv, tvars_type = make_lenv_from_tvars tvars in
 
   let data_typ = Ttyp_data (data_name.node, !tvars_type) in
-  let data_decl =
-    {
-      data_name;
-      constructors = [];
-      tvars = lenv;
-      arity = List.length tvars;
-      data_typ;
-    }
-  in
+  let data_decl = mk_data_decl data_name lenv data_typ in
   Hashtbl.add genv.data_decls data_name.node data_decl;
 
-  List.map (type_data_constructor genv lenv data_decl) constructors
+  ignore (List.map (type_data_constructor genv lenv data_decl) constructors)
 
 (* ========================================================
        CLASS TYPING
    ======================================================== *)
 
 (* Type and check a function declaration found inside a class declaration.
-   This function will add the function declaration to the gloval environnement. *)
+   This function will add the function declaration to the gloval environnement.
+   The function's name is returned. *)
 let type_class_member genv lenv decl =
   match decl.decl_kind with
   | Pdecl_function (name, tvars, instances, params, retty) -> (
@@ -664,7 +679,8 @@ let type_class_member genv lenv decl =
           let tparams = List.map (from_ast_type genv lenv) params in
           let tretty = from_ast_type genv lenv retty in
           let func_decl = mk_func_decl name lenv tparams tretty in
-          Hashtbl.add genv.func_decls name.node func_decl
+          Hashtbl.add genv.func_decls name.node func_decl;
+          name.node
       | Some previous_decl ->
           let hint = previous_declaration_hint previous_decl.func_name.range in
           error_with_maybe_hint name.range
@@ -672,18 +688,75 @@ let type_class_member genv lenv decl =
             hint)
   | _ -> assert false
 
-let mk_class_decl class_name tvars = { class_name; tvars }
+let mk_class_decl class_name class_tvars =
+  { class_name; class_tvars; class_funcs = SSet.empty }
 
 (* Type a class declaration and register it into the global environnement
    with all its functions. *)
-let type_class genv name range tvars fields =
+let type_class genv name range tvars members =
   let lenv, _ = make_lenv_from_tvars tvars in
   let class_decl = mk_class_decl name lenv in
   Hashtbl.add genv.class_decls name.node class_decl;
-  List.iter (type_class_member genv lenv) fields
+  let funcs =
+    List.fold_left
+      (fun acc mem -> SSet.add (type_class_member genv lenv mem) acc)
+      SSet.empty members
+  in
+  class_decl.class_funcs <- funcs
 
 (* ========================================================
-       PROGRAM TYPING
+       INSTANCE TYPING
+   ======================================================== *)
+
+let type_instance_member genv lenv equations = ()
+
+let check_instance_funcs_diff genv range diff_funcs =
+  if not (SSet.is_empty diff_funcs) then (
+    let hint = Buffer.create 1024 in
+    Buffer.add_string hint
+      "the following type class members have not been implemented:\n";
+    SSet.iter
+      (fun func_name ->
+        let func_decl = Hashtbl.find genv.func_decls func_name in
+        let signature = Format.asprintf "  %a\n" pp_func_decl func_decl in
+        Buffer.add_string hint signature)
+      diff_funcs;
+    error_with_hint range "type class instance is missing some members"
+      (Buffer.contents hint))
+
+let type_instance genv (schema, (class_name, class_args)) funcs =
+  match Hashtbl.find_opt genv.class_decls class_name.node with
+  | None -> error class_name.range ("unknown type class " ^ class_name.node)
+  | Some class_decl ->
+      let lenv = Hashtbl.create 0 in
+      let args = List.map (from_ast_type genv lenv) class_args in
+      (* Type each of the instance's members. *)
+      let rec loop declared_funcs decls =
+        match decls with
+        | [] -> declared_funcs
+        | func_decl :: r -> (
+            match func_decl.decl_kind with
+            | Pdecl_equation (name, _, _) -> (
+                match SSet.find_opt name.node declared_funcs with
+                | None ->
+                    (* Lets collect all equations defining the function and type it. *)
+                    let equations, next_decls =
+                      collect_equations name.node (func_decl :: r)
+                    in
+                    type_instance_member genv lenv equations;
+                    loop (SSet.add name.node declared_funcs) next_decls
+                | Some _ ->
+                    (* Multiple declarations of the function inside the instance... *)
+                    error name.range ("redeclaration of value " ^ name.node))
+            | _ -> assert false)
+      in
+      let declared_funcs = loop SSet.empty funcs in
+      (* Check if we implemented all expected functions as required by the class type. *)
+      let diff_funcs = SSet.diff class_decl.class_funcs declared_funcs in
+      check_instance_funcs_diff genv class_name.range diff_funcs
+
+(* ========================================================
+       FILE TYPING
    ======================================================== *)
 
 let mk_builtin_function name params retty =
@@ -695,13 +768,13 @@ let mk_builtin_function name params retty =
     arity = List.length params;
   }
 
-let mk_builtin_data_ty name ty arity =
+let mk_builtin_data_ty name data_typ data_arity =
   {
     data_name = fill_with_dummy_range name;
-    data_typ = ty;
-    arity;
+    data_typ;
+    data_arity;
     constructors = [];
-    tvars = Hashtbl.create 0;
+    data_tvars = Hashtbl.create 0;
   }
 
 let default_genv =
@@ -750,7 +823,7 @@ let default_genv =
 
   { func_decls; cons_decls; data_decls; class_decls }
 
-let file decls =
+let type_file decls =
   let genv = default_genv in
   (* Collect all declarations: *)
   let rec loop acc decls =
@@ -797,7 +870,9 @@ let file decls =
                 error_with_maybe_hint name.range
                   ("redeclaration of class type " ^ name.node)
                   hint)
-        | Pdecl_instance (_, _) -> loop acc r)
+        | Pdecl_instance (schema, funcs) ->
+            type_instance genv schema funcs;
+            loop acc r)
   in
   let tdecls = loop [] decls in
 

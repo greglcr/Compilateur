@@ -67,7 +67,7 @@ let () =
       let f = Parser.file Post_lexer.next_token lb in
       close_in c;
       if !parse_only then exit 0;
-      let typed_f = Typer.file f in
+      let typed_f = Typer.type_file f in
       if !type_only then exit 0
   with
   | Lexing_error msg ->

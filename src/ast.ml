@@ -36,7 +36,7 @@ and decl_kind =
       * decl list (* class declarations (fields) *)
   (* an instance declaration *)
   | Pdecl_instance of
-      instance (* instance target *)
+      schema (* instance schema *)
       * decl list (* instance declarations (fields) *)
 
 (* a data constructor *)
@@ -50,8 +50,11 @@ and typ_kind =
   | Ptyp_data of ident * typ list
 
 (* <ntype> OR (<ntype>+) => <ntype> *)
-and instance =
-  typ list (* instance's dependencies, if any *) * typ (* instance's target *)
+and class_type = ident * typ list
+
+and schema =
+  class_type list (* instance's dependencies *)
+  * class_type (* instance's target *)
 
 and constant =
   (* e.g. true or false *)
