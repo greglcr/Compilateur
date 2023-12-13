@@ -77,19 +77,20 @@ let default_genv =
 let type_file decls =
   let genv = default_genv in
   (* Collect all declarations: *)
-  let rec loop acc decls =
+  let rec loop decls =
     match decls with
-    | [] -> acc
+    | [] -> ()
     | decl :: r -> (
         match decl.decl_kind with
         | Pdecl_equation (name, _, _) ->
-            error name.ident_range ("value " ^ name.spelling ^ " has no type declaration")
+            error name.ident_range
+              ("value " ^ name.spelling ^ " has no type declaration")
         | Pdecl_function (name, _, _, _, _) -> (
             match Hashtbl.find_opt genv.func_decls name.spelling with
             | None ->
                 let equations, next_decls = collect_equations name.spelling r in
-                let tdecl = type_function genv name decl equations in
-                loop (tdecl :: acc) next_decls
+                type_function genv name decl equations;
+                loop next_decls
             | Some previous_decl ->
                 let hint =
                   previous_declaration_hint previous_decl.func_name.ident_range
@@ -101,7 +102,7 @@ let type_file decls =
             match Hashtbl.find_opt genv.data_decls name.spelling with
             | None ->
                 type_data genv name decl.decl_range tvars constructors;
-                loop acc r
+                loop r
             | Some previous_decl ->
                 let hint =
                   previous_declaration_hint previous_decl.data_name.ident_range
@@ -113,7 +114,7 @@ let type_file decls =
             match Hashtbl.find_opt genv.class_decls name.spelling with
             | None ->
                 type_class genv name decl.decl_range tvars fields;
-                loop acc r
+                loop r
             | Some previous_decl ->
                 let hint =
                   previous_declaration_hint previous_decl.class_name.ident_range
@@ -123,13 +124,12 @@ let type_file decls =
                   hint)
         | Pdecl_instance (schema, funcs) ->
             type_instance genv schema funcs;
-            loop acc r)
+            loop r)
   in
-  let tdecls = loop [] decls in
+  loop decls;
 
   if Option.is_none (Hashtbl.find_opt genv.func_decls "main") then
     error Location.dummy_range "value main is missing"
-  else tdecls
 
 (* --------------------------------------------------------
    Pattern Matching Typing
