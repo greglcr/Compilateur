@@ -34,21 +34,20 @@ let type_class_member genv lenv decl =
             hint)
   | _ -> assert false
 
-let mk_class_decl class_name class_tvars =
-  { class_name; class_tvars; class_funcs = SSet.empty }
+let mk_class_decl class_name class_tvars class_funcs =
+  { class_name; class_tvars; class_funcs }
 
 (* Type a class declaration and register it into the global environnement
    with all its functions. *)
 let type_class genv name range tvars members =
   let lenv, _ = make_lenv_from_tvars tvars in
-  let class_decl = mk_class_decl name lenv in
-  Hashtbl.add genv.class_decls name.spelling class_decl;
   let funcs =
     List.fold_left
       (fun acc mem -> SSet.add (type_class_member genv lenv mem) acc)
       SSet.empty members
   in
-  class_decl.class_funcs <- funcs
+  let class_decl = mk_class_decl name lenv funcs in
+  Hashtbl.add genv.class_decls name.spelling class_decl
 
 (* ========================================================
        INSTANCE TYPING
@@ -56,6 +55,7 @@ let type_class genv name range tvars members =
 
 let type_instance_member genv lenv equations = ()
 
+(* Prints all functions that were required but not implemented by the instance. *)
 let check_instance_funcs_diff genv range diff_funcs =
   if not (SSet.is_empty diff_funcs) then (
     let hint = Buffer.create 1024 in

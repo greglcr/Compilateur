@@ -100,7 +100,7 @@ module SSet = Set.Make (String)
 type class_decl = {
   class_name : Ast.ident; (* class's name *)
   class_tvars : (string, typ) Hashtbl.t; (* type variables of the class *)
-  mutable class_funcs : SSet.t;
+  class_funcs : SSet.t;
 }
 
 module V = struct
