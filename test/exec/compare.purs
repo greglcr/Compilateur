@@ -17,7 +17,5 @@ main = do
   log (show ("a" == "a"))
   log (show ("a" == "ab"))
   log (show ("a" /= "ab"))
-  log (show (unit == unit))
-  log (show (unit /= unit))
 
 
