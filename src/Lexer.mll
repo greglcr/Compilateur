@@ -69,7 +69,19 @@ rule next_token = parse
     { UIDENT (u) }
 
   | '"'
-    { CST (Cstring (string lexbuf)) }
+    {
+      (* Calling (string lexbuf) overwrites the start position saved in lexbuf.
+         Sadly, string is called many times when lexing a string literal.
+         Therefore, the start position of the token is incorrect by default.
+         To avoid this, we save manually the start position of the constant
+         and then restore it after lexing it. *)
+      let start_pos = lexbuf.lex_start_pos in
+      let start_p = lexbuf.lex_start_p in
+      let lexed_str = string lexbuf in
+      lexbuf.lex_start_pos <- start_pos;
+      lexbuf.lex_start_p <- start_p;
+      CST (Cstring (lexed_str))
+    }
 
   | "+"
     { PLUS }
@@ -312,13 +324,4 @@ let _menhir_print_token : token -> string =
     "UIDENT"
   | WHERE ->
     "WHERE"
-
-  let print_lexeme fileName =
-    let c = open_in fileName in
-    let lb = from_channel c in
-    let rec liste_lexemes curTok = match curTok with
-      | EOF -> print_string "EOF\n"
-      | _ -> print_string (_menhir_print_token curTok); print_string " "; (liste_lexemes (next_token lb)) in
-    (liste_lexemes (next_token lb));;
-
 }
