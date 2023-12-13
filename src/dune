@@ -1,8 +1,10 @@
+(include_subdirs unqualified)
+
 (ocamllex
- (modules lexer))
+ (modules Lexer))
 
 (menhir
- (modules parser))
+ (modules Parser))
 
 (executable
  (name ppurs)

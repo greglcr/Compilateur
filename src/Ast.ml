@@ -8,7 +8,7 @@ type 'a located_node = { range : Location.range; node : 'a }
 type program = decl list
 
 (* an identifier with source code location data *)
-and ident = string located_node
+and ident = { spelling : string; ident_range : Location.range }
 and decl = { decl_kind : decl_kind; decl_range : Location.range }
 
 and decl_kind =

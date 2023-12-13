@@ -10,6 +10,7 @@
       node
     }
 
+  let mk_ident range spelling = { spelling; ident_range = Location.from_lexing_range range }
   let mk_expr range expr_kind = { expr_kind; expr_range = Location.from_lexing_range range }
   let mk_decl range decl_kind = { decl_kind; decl_range = Location.from_lexing_range range }
   let mk_type range type_kind = { type_kind; type_range = Location.from_lexing_range range }
@@ -66,8 +67,8 @@ file:
       if not (Imports.mem "Effect.Console" imports) then
         raise (Semantic_error (dummy_range, "missing 'import Effect.Console'"));
 
-      if name.node <> "Main" then
-        raise (Semantic_error (name.range, "expected 'Main' as module name"));
+      if name.spelling <> "Main" then
+        raise (Semantic_error (name.ident_range, "expected 'Main' as module name"));
 
       decls
     }
@@ -119,8 +120,8 @@ constructor:
 ;
 
 defn:
-  | name = LIDENT p = patarg* EQ e = expr
-    { mk_decl $loc (Pdecl_equation (mk_node $loc(name) name, p, e)) }
+  | name = lident p = patarg* EQ e = expr
+    { mk_decl $loc (Pdecl_equation (name, p, e)) }
 ;
 
 tdecl:
@@ -146,8 +147,8 @@ atype:
   | name = LIDENT
     { mk_type $loc (Ptyp_variable (name)) }
 
-  | name = UIDENT
-    { mk_type $loc (Ptyp_data (mk_node $loc(name) name, [])) }
+  | name = uident
+    { mk_type $loc (Ptyp_data (name, [])) }
 
   | LPAR t = typ RPAR
     { t }
@@ -260,12 +261,12 @@ expr_kind:
 
 %inline lident:
   | ident = LIDENT
-    { mk_node $loc ident }
+    { mk_ident $loc ident }
 ;
 
 %inline uident:
   | ident = UIDENT
-    { mk_node $loc ident }
+    { mk_ident $loc ident }
 ;
 
 %inline binop:

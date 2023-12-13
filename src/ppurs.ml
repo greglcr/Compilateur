@@ -3,7 +3,7 @@ open Lexing
 open Parser
 open Lexer
 open Ast
-open Typedtree
+open TypedTree
 
 let () = Printexc.record_backtrace true
 let usage = "usage: ppurs [options] file.purs"
@@ -52,10 +52,10 @@ let print_error_with_hint (range_start, range_end) msg hint =
   exit 1
 
 let show_tokens lb =
-  let token = ref (Post_lexer.next_token lb) in
+  let token = ref (PostLexer.next_token lb) in
   while !token != EOF do
     print_endline (_menhir_print_token !token);
-    token := Post_lexer.next_token lb
+    token := PostLexer.next_token lb
   done
 
 let () =
@@ -64,7 +64,7 @@ let () =
   try
     if !lex_only then show_tokens lb
     else
-      let f = Parser.file Post_lexer.next_token lb in
+      let f = Parser.file PostLexer.next_token lb in
       close_in c;
       if !parse_only then exit 0;
       let typed_f = Typer.type_file f in
@@ -79,5 +79,5 @@ let () =
       let range_start = Location.lexeme_start lb in
       let range_end = Location.lexeme_end lb in
       print_error (range_start, range_end) "syntax error"
-  | Typer.Error (range, msg, None) -> print_error range msg
-  | Typer.Error (range, msg, Some hint) -> print_error_with_hint range msg hint
+  | TyperCommon.TypingError (range, msg, None) -> print_error range msg
+  | TyperCommon.TypingError (range, msg, Some hint) -> print_error_with_hint range msg hint
