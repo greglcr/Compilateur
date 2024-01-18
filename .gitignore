@@ -1,5 +1,9 @@
 _build/
 
+.vscode/
+.vs/
+build/
+
 *.automaton
 *.conflicts
 
