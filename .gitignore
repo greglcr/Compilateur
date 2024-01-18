@@ -15,3 +15,5 @@ ppurs
 
 *.purs
 !test/**/*.purs
+
+*.zip
