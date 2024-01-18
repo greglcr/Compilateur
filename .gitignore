@@ -3,6 +3,11 @@ _build/
 *.automaton
 *.conflicts
 
+*.exe
+*.s
+*.o
+*.a
+
 ppurs.exe
 ppurs
 
