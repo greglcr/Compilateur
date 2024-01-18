@@ -6,6 +6,7 @@ import Effect.Console
 
 main :: Effect Unit
 main = do
+  log (show ((-10) / ( 0)))
   log (show ((-10) / ( 3)))
   log (show (( 10) / (-3)))
   log (show ((-10) / (-3)))
