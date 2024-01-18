@@ -1,3 +1,6 @@
 [submodule "iris"]
 	path = iris
 	url = https://github.com/hgruniaux/iris
+[submodule "prt/bdwgc"]
+	path = prt/bdwgc
+	url = https://github.com/ivmai/bdwgc

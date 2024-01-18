@@ -7,5 +7,7 @@ typedef const char* prt_string_t;
 
 void*
 __prt_alloc(prt_int_t n);
+void*
+__prt_alloc_atomic(prt_int_t n);
 
 #endif // !PRT_H
