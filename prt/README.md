@@ -12,7 +12,9 @@ All functions use the standard C calling function.
 
 The runtime provides these functions:
 - `__prt_alloc()`
+- `__prt_alloc_atomic()`
 - `__prt_strconcat()`
+- `__prt_strcmp()`
 - `__prt_show_int()`
 - `__prt_show_bool()`
 - `__prt_log()`
