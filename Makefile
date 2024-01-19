@@ -16,7 +16,8 @@ test-typing: ppurs
 test-exec: ppurs
 	@(cd test && bash test.sh -3 ../ppurs)
 
-test: test-syntax test-typing test-exec
+test: ppurs
+	@(cd test && bash test.sh -all ../ppurs)
 
 clean:
 	dune clean
