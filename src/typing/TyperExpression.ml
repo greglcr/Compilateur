@@ -211,7 +211,14 @@ let rec type_expr genv lenv e =
           let e = snd x in
           unify_range e.typ v e.range)
         tbranches;
+      
+      (*Then, check if the pattern of the branches are exhaustive*)
+
+      (* list_typ contains a list of Ttyp_data *)
+
+      check_exhaust tbranches;
       mk_node v e.expr_range (Texpr_case (tcond, tbranches))
+
 
 and type_branch genv lenv (pattern, expr) =
   let lenv, tpattern = type_pattern genv lenv pattern in
@@ -247,3 +254,33 @@ and type_pattern genv lenv pattern =
             mk_node cons_decl.data_decl.data_typ pattern.pattern_range
               (Tpattern_constructor (name, List.map snd tpatterns)) )
       | None -> error name.ident_range ("unknown data constructor " ^ name.spelling))
+
+and check_exhaust tbranches = 
+  let patterns = List.fold_right (fun x acc -> let (pat, _) = x in pat :: acc) tbranches [] in
+  let rec wildcard_in patterns = match patterns with
+    | [] -> false
+    | {typ = _; range = _; node = Tpattern_wildcard} :: _ -> true
+    | _ :: r_patterns -> wildcard_in r_patterns
+  and check_vars patterns = match patterns with
+    | [] -> false
+    | {typ = Ttyp_variable (_); range = _; node = _} :: r_patterns -> true
+    | _ :: r_patterns -> check_vars r_patterns
+  and check_true patterns = match patterns with
+    | [] -> false
+    | {typ = _; range = _; node = Tpattern_constant(Cbool(true))} :: _-> true
+    | _ :: r_patterns -> check_true r_patterns
+  and check_false patterns = match patterns with
+    | [] -> false
+    | {typ = _; range = _; node = Tpattern_constant(Cbool(false))} :: _ -> true
+    | _ :: r_pattern -> check_false r_pattern in
+  match patterns with
+    | [] -> assert(false)
+    | a :: _ -> let typ_param = a.typ in match (typ_param, patterns) with
+      | (_, []) -> assert(false)
+      | (_, patterns) when wildcard_in patterns -> ()
+      | (_, patterns) when check_vars patterns -> ()
+      | (typ_param, _) when typ_param = int_type -> error Location.dummy_range "Non exhaustive pattern" (* If no wildcard or variable, can't be exhaustive *)
+      | (typ_param, _) when typ_param = string_type -> error Location.dummy_range "Non exhaustive pattern"
+      | (typ, patterns) when typ_param = boolean_type -> if not((check_true patterns) && (check_false patterns)) then error Location.dummy_range "Non exhaustive pattern"
+        (* We first check if all the first parameters are variables *)
+      | _ -> ()

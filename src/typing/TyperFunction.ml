@@ -33,7 +33,7 @@ let type_function_equation genv decl (func_decl : function_decl) pattern_idx
     List.map2
       (fun pattern expected_type ->
         let _, typed_pattern = type_pattern genv !lenv pattern in
-        unify_range typed_pattern.typ expected_type typed_pattern.range;
+        unify_range_strong typed_pattern.typ expected_type typed_pattern.range;
         (match typed_pattern.node with
         | Tpattern_variable v ->
             if Option.is_none (SMap.find_opt v.spelling !lenv) then
@@ -46,7 +46,7 @@ let type_function_equation genv decl (func_decl : function_decl) pattern_idx
       patterns func_decl.params
   in
   let tbody = type_expr genv !lenv body in
-  unify_range tbody.typ func_decl.retty body.expr_range;
+  unify_range_strong tbody.typ func_decl.retty body.expr_range;
 
   (* We also check that there is at most one non-variable pattern
      and it is at the same position as the other non-variables patterns
@@ -167,6 +167,7 @@ let type_function genv name decl equations =
 
          However, this does not affect typing but will be problematic later
          for compilation. *)
+      check_exhaust branches;
       ( [],
         mk_node func_decl.retty Location.dummy_range
           (Texpr_case

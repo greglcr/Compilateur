@@ -49,6 +49,20 @@ let rec unify t1 t2 =
       unify_params args1 args2
   | t1, t2 -> unification_error t1 t2
 
+(*We need another unify function that check that type t1 is more general than t2, useful for function declaration*)
+
+and unify_strong t1 t2 = 
+    match (head t1, head t2) with
+    | Ttyp_variable v1, Ttyp_variable v2 when V.equal v1 v2 -> ()
+    | (Ttyp_variable v1 as t1), t2 ->
+        if occur v1 t2 then unification_error t1 t2;
+        assert (v1.def = None);
+        v1.def <- Some t2
+    | Ttyp_data (name1, args1), Ttyp_data (name2, args2) when name1 = name2 ->
+        unify_params args1 args2
+    | t1, t2 -> unification_error t1 t2
+
+
 and unify_params p1 p2 =
   match (p1, p2) with
   | [], [] -> ()
@@ -91,6 +105,16 @@ let unify_range t1 t2 range =
         pp_type t2
     in
     error range msg
+
+and unify_range_strong t1 t2 range = 
+  try unify_strong t1 t2
+  with UnificationFailure (t1, t2) ->
+    let msg =
+      Format.asprintf "impossible to unify type %a with type %a" pp_type t1
+        pp_type t2
+    in
+    error range msg
+
 
 (* $ can not be typed by the user so this identifier is always different from
     any source or user typed identifier. *)
