@@ -76,6 +76,7 @@ let default_genv =
 
 let type_file decls =
   let genv = default_genv in
+  let funcs = ref [] in
   (* Collect all declarations: *)
   let rec loop decls =
     match decls with
@@ -89,7 +90,7 @@ let type_file decls =
             match Hashtbl.find_opt genv.func_decls name.spelling with
             | None ->
                 let equations, next_decls = collect_equations name.spelling r in
-                type_function genv name decl equations;
+                funcs := type_function genv name decl equations :: !funcs;
                 loop next_decls
             | Some previous_decl ->
                 let hint =
@@ -129,7 +130,9 @@ let type_file decls =
   loop decls;
 
   if Option.is_none (Hashtbl.find_opt genv.func_decls "main") then
-    error Location.dummy_range "value main is missing"
+    error Location.dummy_range "value main is missing";
+
+  !funcs
 
 (* --------------------------------------------------------
    Pattern Matching Typing
