@@ -9,5 +9,5 @@
 (executable
  (name ppurs)
  (promote (until-clean))
- (libraries iris)
+ (libraries iris unix)
  (flags ()))

@@ -10,13 +10,22 @@ let usage = "usage: ppurs [options] file.purs"
 let lex_only = ref false
 let parse_only = ref false
 let type_only = ref false
+let compile = ref false
+let execute = ref false
 
 let spec =
-  [
-    ("--lex-only", Arg.Set lex_only, "  stop after lexing and print all tokens");
-    ("--parse-only", Arg.Set parse_only, "  stop after parsing");
-    ("--type-only", Arg.Set type_only, "  stop after typing");
-  ]
+  Arg.align
+    [
+      ( "--lex-only",
+        Arg.Set lex_only,
+        "  stop after lexing and print all tokens" );
+      ("--parse-only", Arg.Set parse_only, "  stop after parsing");
+      ("--type-only", Arg.Set type_only, "  stop after typing");
+      ("-c", Arg.Set compile, "  generate a binary executable file directly");
+      ( "-e",
+        Arg.Set execute,
+        "  execute on-fly the compiled PetitPureScript code" );
+    ]
 
 let file =
   let file = ref None in
@@ -68,7 +77,17 @@ let () =
       close_in c;
       if !parse_only then exit 0;
       let typed_f = Typer.type_file f in
-      if !type_only then exit 0
+      if !type_only then exit 0;
+
+      let file_without_ext = Filename.remove_extension file in
+
+      if !compile then (
+        if not (Execute.compile (file_without_ext ^ ".exe") typed_f) then exit 1)
+      else if !execute then
+        match Execute.execute typed_f with
+        | None -> exit (-1)
+        | Some exit_code -> exit exit_code
+      else Execute.compile_asm (file_without_ext ^ ".s") typed_f
   with
   | Lexing_error msg ->
       let range_start = Location.lexeme_start lb in
@@ -80,4 +99,5 @@ let () =
       let range_end = Location.lexeme_end lb in
       print_error (range_start, range_end) "syntax error"
   | TyperCommon.TypingError (range, msg, None) -> print_error range msg
-  | TyperCommon.TypingError (range, msg, Some hint) -> print_error_with_hint range msg hint
+  | TyperCommon.TypingError (range, msg, Some hint) ->
+      print_error_with_hint range msg hint
