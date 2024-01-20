@@ -155,10 +155,12 @@ let rec codegen_expr ib env expr =
               else failwith "unexpected type for show builtin function"
           | _ -> failwith "invalid arguments for show builtin function")
       | _ ->
+          let arg_types = List.map (fun arg -> arg.typ) args in
           let args =
             List.map (fun arg -> Ir.Iop_reg (codegen_expr ib env arg)) args
           in
-          let callee = Option.get (Ir.get_fn ib.ctx name.spelling) in
+          let callee_name = NameMangler.mangle name.spelling arg_types in
+          let callee = Option.get (Ir.get_fn ib.ctx callee_name) in
           IrBuilder.mk_call ib callee args)
   | Texpr_constructor _ -> failwith "TODO: codegen constructors"
   | Texpr_if (cond, then_expr, else_expr) ->
@@ -178,11 +180,9 @@ let rec codegen_expr ib env expr =
       codegen_expr ib (SMap.add name.spelling var_value env) expr
   | Texpr_case _ -> failwith "TODO: codegen cases"
 
-let mangle_func_name name =
-  if name.spelling = "main" then "__ppurs_main" else name.spelling
-
 let codegen_fn ctx name params body =
-  let fn_name = mangle_func_name name in
+  let fn_param_types = List.map snd params in
+  let fn_name = NameMangler.mangle name.spelling fn_param_types in
   let fn = Option.get (Ir.get_fn ctx fn_name) in
   let ib = IrBuilder.create_for_fn fn in
 
@@ -192,7 +192,12 @@ let codegen_fn ctx name params body =
   fn.fn_entry <- Some entry_bb.b_label;
   IrBuilder.set_bb ib entry_bb;
 
-  let ret_value = codegen_expr ib SMap.empty body in
+  let env =
+    List.fold_left2
+      (fun env (name, _) ir_name -> SMap.add name.spelling ir_name env)
+      SMap.empty params fn.fn_params
+  in
+  let ret_value = codegen_expr ib env body in
 
   if body.typ = effect_unit then IrBuilder.set_term ib Iterm_ret
   else IrBuilder.set_term ib (Iterm_retv (Iop_reg ret_value));
@@ -204,7 +209,8 @@ let codegen ctx decls =
     (fun decl ->
       match decl.TypedTree.node with
       | Tdecl_function (name, params, body) ->
-          let fn_name = mangle_func_name name in
+          let fn_param_types = List.map snd params in
+          let fn_name = NameMangler.mangle name.spelling fn_param_types in
           let iris_params =
             List.map (fun (_, typ) -> to_iris_type typ) params
           in
