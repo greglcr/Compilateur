@@ -95,6 +95,7 @@ and constructor_decl = {
   arity : int; (* number of arguments *)
 }
 
+module SMap = Map.Make (String)
 module SSet = Set.Make (String)
 
 type class_decl = {
