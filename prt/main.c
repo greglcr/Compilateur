@@ -8,7 +8,6 @@ extern void __ppurs_main();
 int main() {
 #ifdef PRT_USE_GC
   GC_INIT();
-  GC_enable_incremental();
 #endif // PRT_USE_GC
 
   __ppurs_main();
