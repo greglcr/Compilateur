@@ -54,6 +54,7 @@ let mk_show_int ib s =
   IrBuilder.mk_call ib builtin_show_int [ Ir.Iop_reg s ]
 
 let to_iris_type typ =
+  let typ = TyperCommon.head typ in
   if typ = boolean_type || typ = int_type then Ir.Ityp_int
   else if typ = string_type then Ir.Ityp_ptr
   else Ir.Ityp_void
@@ -75,7 +76,7 @@ let rec codegen_expr ib env expr =
       IrBuilder.mk_logical_or ib lhs (fun ib -> codegen_expr ib env rhs)
   | Texpr_binary
       ({ node = (Beq | Bneq | Blt | Ble | Bgt | Bge) as op }, lhs, rhs) -> (
-      let is_string = lhs.typ = string_type in
+      let is_string = TyperCommon.head lhs.typ = string_type in
       let lhs = codegen_expr ib env lhs in
       let rhs = codegen_expr ib env rhs in
 
@@ -124,7 +125,12 @@ let rec codegen_expr ib env expr =
           match args with
           | [ arg ] ->
               let arg = codegen_expr ib env arg in
-              IrBuilder.mk_not ib arg
+              (* not is a bitwise not which is not the same as the expected
+                 logical not of PureScript. We must only keep the least
+                 significant bit (AND with 1). *)
+              let not = IrBuilder.mk_not ib arg in
+              let one = IrBuilder.mk_int ib Z.one in
+              IrBuilder.mk_and ib not one
           | _ -> failwith "invalid arguments for not builtin function")
       | "mod" -> (
           match args with
@@ -143,8 +149,9 @@ let rec codegen_expr ib env expr =
           match args with
           | [ s ] ->
               let scg = codegen_expr ib env s in
-              if s.typ = int_type then mk_show_int ib scg
-              else if s.typ = boolean_type then mk_show_bool ib scg
+              let typ = TyperCommon.head s.typ in
+              if typ = int_type then mk_show_int ib scg
+              else if typ = boolean_type then mk_show_bool ib scg
               else failwith "unexpected type for show builtin function"
           | _ -> failwith "invalid arguments for show builtin function")
       | _ ->
@@ -191,9 +198,7 @@ let codegen_fn ctx name params body =
   else IrBuilder.set_term ib (Iterm_retv (Iop_reg ret_value));
   IrBuilder.finish ib
 
-let codegen decls =
-  let ctx = Ir.mk_ctx () in
-
+let codegen ctx decls =
   (* Register functions in Iris. *)
   List.iter
     (fun decl ->
@@ -215,8 +220,4 @@ let codegen decls =
       match decl.TypedTree.node with
       | Tdecl_function (name, params, body) -> codegen_fn ctx name params body
       | _ -> failwith "TODO")
-    decls;
-
-  (* The codegen: *)
-  let pm = PassManager.create Backend.Arch_x64 in
-  PassManager.run_on_ctx pm ctx
+    decls
