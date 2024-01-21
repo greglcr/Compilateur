@@ -30,19 +30,23 @@ let type_function_equation genv decl (func_decl : function_decl) pattern_idx
   let lenv = ref SMap.empty in
   (* Then, we check if each pattern is correctly typed. *)
   let tpatterns =
+    let rec add_to_lenv_in_depth typed_pattern = match typed_pattern.node with
+      | Tpattern_variable v ->
+        if Option.is_none (SMap.find_opt v.spelling !lenv) then
+          lenv := SMap.add v.spelling typed_pattern.typ !lenv
+        else
+          error typed_pattern.range
+            ("pattern variable " ^ v.spelling ^ " appears more than once")
+      | Tpattern_constructor(name, patterns) -> List.iter (fun pattern -> add_to_lenv_in_depth pattern) patterns; ()
+      | _ -> () (* For Tpattern_wildcard and Tpattern_constant *) in
     List.map2
       (fun pattern expected_type ->
         let _, typed_pattern = type_pattern genv !lenv pattern in
         unify_range_strong typed_pattern.typ expected_type typed_pattern.range;
-        (match typed_pattern.node with
-        | Tpattern_variable v ->
-            if Option.is_none (SMap.find_opt v.spelling !lenv) then
-              lenv := SMap.add v.spelling typed_pattern.typ !lenv
-            else
-              error typed_pattern.range
-                ("pattern variable " ^ v.spelling ^ " appears more than once")
-        | _ -> ());
+        add_to_lenv_in_depth typed_pattern;
         typed_pattern)
+        (*On a les pattern qui sont typé. Le problème, c'est qu'on va pas rentrer assez en profondeur pour typer toutes les variables dans les patterns
+           Il faut donc faire un truc récursif un peu comme dans l'exhaustivité des patterns matching*)
       patterns func_decl.params
   in
   let tbody = type_expr genv !lenv body in
