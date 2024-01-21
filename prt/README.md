@@ -22,5 +22,7 @@ The runtime provides these functions:
 - `__prt_log_bool()`
 - `__prt_div()`
 - `__prt_rem()`
+- `__prt_trace()`
+- `__prt_safe_trace()`
 
-It also implements the C `main` function and calls `__ppurs_main` (which is the entry point of the compiled program by MiniPureScript).
+It also implements the C `main` function and calls `_P4main` (which is the entry point of the compiled program by MiniPureScript).

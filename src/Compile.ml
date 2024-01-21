@@ -25,7 +25,7 @@ let compile out_file_name typed_f =
   let asm_tmp_name = compile_asm_to_tmp typed_f in
   let gcc_pid =
     Unix.create_process cc
-      [| cc; asm_tmp_name; "-o"; out_file_name; "prt/libprt.a" |]
+      [| cc; asm_tmp_name; "-o"; out_file_name; "prt/libprt.a"; "-g"; "-rdynamic" |]
       Unix.stdin Unix.stdout Unix.stderr
   in
   let _, process_status = Unix.waitpid [] gcc_pid in

@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <string.h>
 
 #include "prt.h"
@@ -15,7 +14,7 @@
 prt_string_t
 __prt_strconcat(prt_string_t lhs, prt_string_t rhs)
 {
-  assert(lhs != NULL && rhs != NULL);
+  PRT_ASSERT(lhs != NULL && rhs != NULL);
 
   const size_t lhs_len = strlen(lhs);
   const size_t rhs_len = strlen(rhs);
@@ -39,6 +38,6 @@ __prt_strconcat(prt_string_t lhs, prt_string_t rhs)
 prt_int_t
 __prt_strcmp(prt_string_t lhs, prt_string_t rhs)
 {
-  assert(lhs != NULL && rhs != NULL);
+  PRT_ASSERT(lhs != NULL && rhs != NULL);
   return strcmp(lhs, rhs);
 }

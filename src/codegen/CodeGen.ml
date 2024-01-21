@@ -1,6 +1,7 @@
 open TypedTree
 open Ast
 open LibIris
+open CodeGenCommon
 
 (** Should we use native division (the idiv x86 instruction) or use the real PureScript
     division implemented in the runtime library? The later is slower but compliant
@@ -52,12 +53,6 @@ let mk_show_int ib s =
       Ityp_ptr [ Ityp_int ]
   in
   IrBuilder.mk_call ib builtin_show_int [ Ir.Iop_reg s ]
-
-let to_iris_type typ =
-  let typ = TyperCommon.head typ in
-  if typ = boolean_type || typ = int_type then Ir.Ityp_int
-  else if typ = string_type then Ir.Ityp_ptr
-  else Ir.Ityp_void
 
 let rec codegen_expr ib env expr =
   match expr.TypedTree.node with
@@ -154,6 +149,13 @@ let rec codegen_expr ib env expr =
               else if typ = boolean_type then mk_show_bool ib scg
               else failwith "unexpected type for show builtin function"
           | _ -> failwith "invalid arguments for show builtin function")
+      | "pure" -> (
+          match args with
+          | [ s ] ->
+              (* Just consider pure as the identity function. *)
+              let scg = codegen_expr ib env s in
+              scg
+          | _ -> failwith "invalid arguments for pure builtin function")
       | _ ->
           let arg_types = List.map (fun arg -> arg.typ) args in
           let args =
@@ -212,9 +214,9 @@ let codegen ctx decls =
           let fn_param_types = List.map snd params in
           let fn_name = NameMangler.mangle name.spelling fn_param_types in
           let iris_params =
-            List.map (fun (_, typ) -> to_iris_type typ) params
+            List.map (fun (_, typ) -> convert_type typ) params
           in
-          let iris_retty = to_iris_type body.typ in
+          let iris_retty = convert_type body.typ in
           let fn = Ir.get_or_insert_fn ctx fn_name iris_retty iris_params in
           ignore fn
       | _ -> failwith "TODO")

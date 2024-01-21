@@ -15,7 +15,7 @@ let execute = ref false
 
 let spec =
   Arg.align
-    [
+    ([
       ( "--lex-only",
         Arg.Set lex_only,
         "  stop after lexing and print all tokens" );
@@ -25,7 +25,8 @@ let spec =
       ( "-e",
         Arg.Set execute,
         "  execute on-fly the compiled PetitPureScript code" );
-    ]
+    ] @ LibIris.CmdArgs.spec
+    )
 
 let file =
   let file = ref None in
@@ -40,12 +41,6 @@ let file =
   | None ->
       Arg.usage spec usage;
       exit 1
-
-let report (b, e) =
-  let l = b.pos_lnum in
-  let fc = b.pos_cnum - b.pos_bol + 1 in
-  let lc = e.pos_cnum - b.pos_bol + 1 in
-  eprintf "File \"%s\", line %d, characters %d-%d:\n" file l fc lc
 
 let print_error (range_start, range_end) msg =
   if not (Location.is_dummy_range (range_start, range_end)) then
@@ -82,12 +77,12 @@ let () =
       let file_without_ext = Filename.remove_extension file in
 
       if !compile then (
-        if not (Execute.compile (file_without_ext ^ ".exe") typed_f) then exit 1)
+        if not (Compile.compile (file_without_ext ^ ".exe") typed_f) then exit 1)
       else if !execute then
-        match Execute.execute typed_f with
+        match Compile.execute typed_f with
         | None -> exit (-1)
         | Some exit_code -> exit exit_code
-      else Execute.compile_asm (file_without_ext ^ ".s") typed_f
+      else Compile.compile_asm (file_without_ext ^ ".s") typed_f
   with
   | Lexing_error msg ->
       let range_start = Location.lexeme_start lb in
