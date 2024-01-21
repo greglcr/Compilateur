@@ -82,7 +82,7 @@ type function_impl = {
 
 and data_decl = {
   data_name : Ast.ident; (* data's name *)
-  constructors : constructor_decl list; (* list of constructors *)
+  mutable constructors : constructor_decl list; (* list of constructors *)
   data_tvars : (string, typ) Hashtbl.t; (* type variables of the data *)
   data_arity : int; (* number of type variables *)
   data_typ : typ; (* type of this data *)

@@ -39,6 +39,7 @@ let type_data genv data_name range tvars constructors =
 
   let data_typ = Ttyp_data (data_name.spelling, !tvars_type) in
   let data_decl = mk_data_decl data_name lenv data_typ in
-  Hashtbl.add genv.data_decls data_name.spelling data_decl;
 
-  ignore (List.map (type_data_constructor genv lenv data_decl) constructors)
+  let typed_constructors = List.map (type_data_constructor genv lenv data_decl) constructors in
+  data_decl.constructors <- typed_constructors;
+  Hashtbl.add genv.data_decls data_name.spelling data_decl;
