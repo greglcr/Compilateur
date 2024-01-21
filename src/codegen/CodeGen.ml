@@ -54,15 +54,34 @@ let mk_show_int ib s =
   in
   IrBuilder.mk_call ib builtin_show_int [ Ir.Iop_reg s ]
 
-let rec codegen_expr ib env expr =
-  match expr.TypedTree.node with
-  | Texpr_constant (Cbool true) -> IrBuilder.mk_true ib
-  | Texpr_constant (Cbool false) -> IrBuilder.mk_false ib
-  | Texpr_constant (Cint n) -> IrBuilder.mk_int ib (Z.of_int n)
-  | Texpr_constant (Cstring s) -> IrBuilder.mk_zstring ib s
-  | Texpr_constant Cunit ->
+let mk_constant ib c =
+  match c with
+  | Cbool true -> IrBuilder.mk_true ib
+  | Cbool false -> IrBuilder.mk_false ib
+  | Cint n -> IrBuilder.mk_int ib (Z.of_int n)
+  | Cstring s -> IrBuilder.mk_zstring ib s
+  | Cunit ->
       IrBuilder.mk_int ib
         Z.zero (* create a dummy instruction that will be removed by DCE *)
+
+let mk_constant_eq ib e c =
+  let is_string = match c with Cstring _ -> true | _ -> false in
+
+  let c = mk_constant ib c in
+
+  if is_string then
+    let builtin_strcmp =
+      Ir.get_or_insert_fn ib.IrBuilder.ctx "__prt_strcmp" ~is_external:true
+        Ityp_int [ Ityp_ptr; Ityp_ptr ]
+    in
+    let cmp = IrBuilder.mk_call ib builtin_strcmp [ Iop_reg e; Iop_reg c ] in
+    let zero = IrBuilder.mk_int ib Z.zero in
+    IrBuilder.mk_eq ib cmp zero
+  else IrBuilder.mk_eq ib e c
+
+let rec codegen_expr ib env expr =
+  match expr.TypedTree.node with
+  | Texpr_constant c -> mk_constant ib c
   | Texpr_binary ({ node = Band }, lhs, rhs) ->
       let lhs = codegen_expr ib env lhs in
       IrBuilder.mk_logical_and ib lhs (fun ib -> codegen_expr ib env rhs)
@@ -180,7 +199,75 @@ let rec codegen_expr ib env expr =
   | Texpr_let ((name, init_expr), expr) ->
       let var_value = codegen_expr ib env init_expr in
       codegen_expr ib (SMap.add name.spelling var_value env) expr
-  | Texpr_case _ -> failwith "TODO: codegen cases"
+  | Texpr_case (value, branches) ->
+      let value = codegen_expr ib env value in
+      codegen_case ib env value branches
+
+and codegen_pattern ib env value pattern success_codegen fail_codegen =
+  match pattern.TypedTree.node with
+  | Tpattern_wildcard -> success_codegen ib env
+  | Tpattern_constant cst ->
+      let cond = mk_constant_eq ib value cst in
+      IrBuilder.mk_if_expr ib cond
+        (fun ib -> success_codegen ib env)
+        (fun ib -> fail_codegen ib env)
+  | Tpattern_variable var ->
+      success_codegen ib (SMap.add var.spelling value env)
+  | Tpattern_constructor (const, patterns) ->
+      (* FIXME: handle constructor in pattern matching *)
+      let discriminant = CodeGenDataType.constructor_discriminant ib value in
+      let expected_discriminant = IrBuilder.mk_int ib Z.zero in
+      let cond = IrBuilder.mk_eq ib discriminant expected_discriminant in
+      IrBuilder.mk_if_expr ib cond
+        (fun ib ->
+          (* TODO: get fields of constructor *)
+          let fields = [] in
+          let codegen =
+            List.fold_right2
+              (fun pattern field success_codegen ib env ->
+                codegen_pattern ib env field pattern success_codegen
+                  fail_codegen)
+              patterns fields success_codegen
+          in
+          codegen ib env)
+        (fun ib -> fail_codegen ib env)
+
+and codegen_case ib env value branches =
+  match branches with
+  | [] -> assert false
+  | [ (pattern, expr) ] ->
+      let error_bb = IrBuilder.mk_bb ib in
+      let exit_bb = IrBuilder.mk_bb ib in
+      let value =
+        codegen_pattern ib env value pattern
+          (fun ib env -> codegen_expr ib env expr)
+          (fun ib env ->
+            IrBuilder.set_term ib (Iterm_jmp error_bb.b_label);
+            IrBuilder.mk_int ib Z.zero)
+      in
+
+      IrBuilder.set_term ib (Iterm_jmp exit_bb.b_label);
+
+      (* Create the error panic code. *)
+      IrBuilder.set_bb ib error_bb;
+
+      let builtin_pattern_fail =
+        Ir.get_or_insert_fn ib.ctx "__prt_pattern_fail" Ityp_void []
+          ~is_external:true
+      in
+
+      (* Call __prt_pattern_fail which will print an error message
+         and abort the program. *)
+      ignore (IrBuilder.mk_call ib builtin_pattern_fail []);
+      IrBuilder.set_term ib Iterm_unreachable;
+
+      (* Return the value computed by the pattern matching in case of success. *)
+      IrBuilder.set_bb ib exit_bb;
+      value
+  | (pattern, expr) :: branches ->
+      codegen_pattern ib env value pattern
+        (fun ib env -> codegen_expr ib env expr)
+        (fun ib env -> codegen_case ib env value branches)
 
 let codegen_fn ctx name params body =
   let fn_param_types = List.map snd params in
