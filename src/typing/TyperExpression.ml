@@ -116,7 +116,7 @@ let rec type_expr genv lenv e =
           let return_type = Ttyp_variable (V.create ()) in
           unify_range (List.hd func_args_type) return_type e.expr_range;
           (* unify return type *)
-          mk_node return_type e.expr_range (Texpr_apply (name, targs)))
+          mk_node return_type e.expr_range (Texpr_apply (func_decl, targs)))
   | Ast.Pexpr_constructor (name, args) -> (
       (* The typing of a constructor call is almost the same as a
          function apply expression. *)
@@ -154,7 +154,7 @@ let rec type_expr genv lenv e =
           let return_type = Ttyp_variable (V.create ()) in
           unify_range (List.hd cons_args_type) return_type e.expr_range;
           (* unify return type *)
-          mk_node return_type e.expr_range (Texpr_constructor (name, targs)))
+          mk_node return_type e.expr_range (Texpr_constructor (cons_decl, targs)))
   | Ast.Pexpr_if (cond, then_, else_) ->
       let tcond = type_expr genv lenv cond in
       let tthen = type_expr genv lenv then_ in
@@ -211,7 +211,7 @@ let rec type_expr genv lenv e =
           let e = snd x in
           unify_range e.typ v e.range)
         tbranches;
-      
+
       (*Then, check if the pattern of the branches are exhaustive*)
 
       (* list_typ contains a list of Ttyp_data *)
@@ -255,7 +255,7 @@ and type_pattern genv lenv pattern =
               (Tpattern_constructor (name, List.map snd tpatterns)) )
       | None -> error name.ident_range ("unknown data constructor " ^ name.spelling))
 
-(*and check_exhaust tbranches = 
+(*and check_exhaust tbranches =
   let patterns = List.fold_right (fun x acc -> let (pat, _) = x in pat :: acc) tbranches [] in
   let rec wildcard_in patterns = match patterns with
     | [] -> false
@@ -282,11 +282,11 @@ and type_pattern genv lenv pattern =
       | (typ_param, _) when typ_param = int_type -> error Location.dummy_range "Non exhaustive pattern" (* If no wildcard or variable, can't be exhaustive *)
       | (typ_param, _) when typ_param = string_type -> error Location.dummy_range "Non exhaustive pattern"
       | (typ, patterns) when typ_param = boolean_type -> if not((check_true patterns) && (check_false patterns)) then error Location.dummy_range "Non exhaustive pattern"
-      | 
+      |
       | _ -> ()
 in aux patterns*)
 
-and check_exhaust genv tbranches = 
+and check_exhaust genv tbranches =
   let patterns = List.fold_right (fun x acc -> let (pat, _) = x in [pat] :: acc) tbranches [] in
   let rec get_line_with_wildcard_and_variables patterns = match patterns with
     | [] -> []
@@ -304,12 +304,12 @@ and check_exhaust genv tbranches =
     | [] :: r_patterns -> get_line_with_false r_patterns
     | ({typ = _; range = _; node = Tpattern_constant(Cbool(false))} :: r_pattern) :: r_patterns -> r_pattern :: (get_line_with_false r_patterns)
     | _ :: r_patterns -> get_line_with_false r_patterns
-  and fill_new_matrices new_matrices data_info = 
+  and fill_new_matrices new_matrices data_info =
     let rec aux constructors = match constructors with
       | [] -> ()
       | constructor :: r_constructors -> Hashtbl.add new_matrices constructor.cons_name.spelling []; aux r_constructors in
     aux data_info.constructors
-  and construct_new_matrice new_matrices construct_name patterns = 
+  and construct_new_matrice new_matrices construct_name patterns =
     let nb_arguments = (Hashtbl.find genv.cons_decls construct_name).arity in
     let rec type_patterns types patterns = match (types, patterns) with
       | ([], []) -> []
@@ -317,16 +317,16 @@ and check_exhaust genv tbranches =
       | _ -> assert(false) (* Normalement impossible *) in
     let rec aux patterns = match patterns with
       | [] -> ()
-      | ({typ = _; range = _; node = Tpattern_constructor(name, arguments)} :: r_pattern) :: r_patterns when name.spelling = construct_name -> 
+      | ({typ = _; range = _; node = Tpattern_constructor(name, arguments)} :: r_pattern) :: r_patterns when name.spelling = construct_name ->
         let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args arguments in
         let new_list = arguments @ r_pattern in
         Hashtbl.replace new_matrices construct_name (new_list :: Hashtbl.find new_matrices construct_name);
         aux r_patterns
-      | ({typ = Ttyp_variable (_); range = _; node = _} :: r_pattern) :: r_patterns -> 
+      | ({typ = Ttyp_variable (_); range = _; node = _} :: r_pattern) :: r_patterns ->
         let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args (List.init nb_arguments (fun _ -> Tpattern_wildcard)) in
         Hashtbl.replace new_matrices construct_name ((typed_arguments @ r_pattern) :: Hashtbl.find new_matrices construct_name);
         aux r_patterns
-      | ({typ = _; range = _; node = Tpattern_wildcard} :: r_pattern) :: r_patterns -> 
+      | ({typ = _; range = _; node = Tpattern_wildcard} :: r_pattern) :: r_patterns ->
         let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args (List.init nb_arguments (fun _ -> Tpattern_wildcard)) in
         Hashtbl.replace new_matrices construct_name ((typed_arguments @ r_pattern) :: Hashtbl.find new_matrices construct_name);
         aux r_patterns

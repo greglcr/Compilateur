@@ -132,9 +132,10 @@ let rec codegen_expr ib env expr =
       (* String concat *)
       | Bconcat -> mk_string_concat ib lhs rhs)
   | Texpr_variable var -> SMap.find var.spelling env
-  | Texpr_apply (name, args) -> (
+  | Texpr_apply (func_decl, args) -> (
       (* We have special cases for some builtin functions for performance reasons. *)
-      match name.spelling with
+      let fun_name = func_decl.func_name.spelling in
+      match fun_name with
       | "not" -> (
           match args with
           | [ arg ] ->
@@ -180,10 +181,24 @@ let rec codegen_expr ib env expr =
           let args =
             List.map (fun arg -> Ir.Iop_reg (codegen_expr ib env arg)) args
           in
-          let callee_name = NameMangler.mangle name.spelling arg_types in
+          let callee_name = NameMangler.mangle fun_name arg_types in
           let callee = Option.get (Ir.get_fn ib.ctx callee_name) in
           IrBuilder.mk_call ib callee args)
-  | Texpr_constructor _ -> failwith "TODO: codegen constructors"
+  | Texpr_constructor (const_decl, args) ->
+      let typ =
+        CodeGenDataType.type_of_constructor (List.map (fun arg -> arg.typ) args)
+      in
+      let addr = mk_alloc ib typ in
+      let discriminant =
+        IrBuilder.mk_int ib (Z.of_int const_decl.const_discriminant)
+      in
+      IrBuilder.mk_storefield ib typ addr 0 discriminant;
+      List.iteri
+        (fun i arg ->
+          let arg = codegen_expr ib env arg in
+          IrBuilder.mk_storefield ib typ addr (i + 1) arg)
+        args;
+      addr
   | Texpr_if (cond, then_expr, else_expr) ->
       let cond = codegen_expr ib env cond in
       IrBuilder.mk_if_expr ib cond
@@ -300,6 +315,8 @@ let codegen ctx decls =
       | Tdecl_function (name, params, body) ->
           let fn_param_types = List.map snd params in
           let fn_name = NameMangler.mangle name.spelling fn_param_types in
+
+          Format.eprintf "CODEGEN %s@." fn_name;
           let iris_params =
             List.map (fun (_, typ) -> convert_type typ) params
           in

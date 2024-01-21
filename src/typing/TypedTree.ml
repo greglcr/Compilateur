@@ -38,9 +38,9 @@ and expr_kind =
   (* variable name *)
   | Texpr_variable of Ast.ident
   (* function name, arguments *)
-  | Texpr_apply of Ast.ident * expr list
+  | Texpr_apply of function_decl * expr list
   (* constructor name, arguments *)
-  | Texpr_constructor of Ast.ident * expr list
+  | Texpr_constructor of constructor_decl * expr list
   (* condition expression, then expression, else expression *)
   | Texpr_if of expr * expr * expr
   (* block of multiple expressions *)
@@ -67,7 +67,7 @@ and pattern_kind =
 (* <pattern> -> <expr> *)
 and branch = pattern * expr
 
-type function_decl = {
+and function_decl = {
   func_name : Ast.ident; (* function's name *)
   params : typ list; (* parameters types *)
   arity : int; (* number of parameters *)
@@ -75,7 +75,7 @@ type function_decl = {
   retty : typ; (* return type of the function *)
 }
 
-type function_impl = {
+and function_impl = {
   func_decl : function_decl; (* function's declaration *)
   func_expr : expr; (* funmction's body expression *)
 }
@@ -89,6 +89,7 @@ and data_decl = {
 }
 
 and constructor_decl = {
+  const_discriminant : int; (* constructor's discriminant *)
   cons_name : Ast.ident; (* constructor's name *)
   data_decl : data_decl; (* the data to whom this constructor is attached *)
   args : typ list; (* expected arguments types *)
