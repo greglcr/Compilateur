@@ -6,7 +6,7 @@ Le projet utilise `dune` pour sa compilation. Il suffit d'exécuter la commande 
 
 Toutefois, pour simplifier la compilation, un fichier Makefile est aussi fourni :
 - `make`: compile le compilateur et genére le program `ppurs`
-- `make clear`: nettoie les fichiers préalablement générer par `make`
+- `make clear`: nettoie les fichiers préalablement générés par `make`
 
 ## Test
 
