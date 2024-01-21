@@ -1,6 +1,6 @@
-#include <stdlib.h>
 #include <execinfo.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /**
  * Prints the current backtrace to the standard error output.
@@ -8,12 +8,11 @@
 void
 __prt_trace()
 {
-  void *array[10];
+  void* array[10];
 
   int size = backtrace(array, 10);
-  char **strings = backtrace_symbols(array, size);
-  if (strings != NULL)
-  {
+  char** strings = backtrace_symbols(array, size);
+  if (strings != NULL) {
     fputs("Backtrace:\n", stderr);
     for (int i = 0; i < size; i++)
       fprintf(stderr, "[%d]: %s\n", i, strings[i]);
@@ -31,7 +30,7 @@ __prt_trace()
 void
 __prt_safe_trace()
 {
-  void *array[10];
+  void* array[10];
   int size;
 
   size = backtrace(array, 10);

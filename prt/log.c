@@ -35,6 +35,7 @@ __prt_log_bool(prt_bool_t b)
  * @param v The integer to print to the standard output.
  */
 void
-__prt_log_int(prt_int_t v) {
+__prt_log_int(prt_int_t v)
+{
   printf("%lld", v);
 }

@@ -15,7 +15,7 @@
  * @param n The count of bytes to allocate.
  * @return A pointer to the newly allocated block.
  */
-void *
+void*
 __prt_alloc(prt_int_t n)
 {
   PRT_ASSERT(n > 0); // we forbid 0 and negative values
@@ -34,7 +34,7 @@ __prt_alloc(prt_int_t n)
  * the allocated memory block for pointers. This is ideal for strings
  * or arrays of scalar types (integers, floating-points, etc.).
  */
-void *
+void*
 __prt_alloc_atomic(prt_int_t n)
 {
   PRT_ASSERT(n > 0); // we forbid 0 and negative values

@@ -9,22 +9,19 @@
  * @param a The dividend.
  * @param b The divisor.
  * @return The quotient.
- * @see https://pursuit.purescript.org/packages/purescript-prelude/5.0.1/docs/Data.EuclideanRing
+ * @see
+ * https://pursuit.purescript.org/packages/purescript-prelude/5.0.1/docs/Data.EuclideanRing
  */
 prt_int_t
 __prt_div(prt_int_t a, prt_int_t b)
 {
-  if (b == 0)
-  {
+  if (b == 0) {
     // Division by 0 gives 0 by convention of PureScript.
     return 0;
-  }
-  else if (b < 0)
-  {
+  } else if (b < 0) {
     // The divisor is negative, we round towards positive infinity.
     return a / b + (a % b != 0 && (a <= 0));
-  }
-  else // if (b > 0)
+  } else // if (b > 0)
   {
     // The divisor is positive, we round towards negative infinity.
     return a / b - (a % b != 0 && (a <= 0));
@@ -40,7 +37,8 @@ __prt_div(prt_int_t a, prt_int_t b)
  * @param a The dividend.
  * @param b The divisor.
  * @return The remainder (always positive).
- * @see https://pursuit.purescript.org/packages/purescript-prelude/5.0.1/docs/Data.EuclideanRing
+ * @see
+ * https://pursuit.purescript.org/packages/purescript-prelude/5.0.1/docs/Data.EuclideanRing
  */
 prt_int_t
 __prt_rem(prt_int_t a, prt_int_t b)
@@ -55,8 +53,7 @@ __prt_rem(prt_int_t a, prt_int_t b)
 
   prt_int_t m = a % b;
 
-  if (m < 0)
-  {
+  if (m < 0) {
     m = (b < 0) ? m - b : m + b;
   }
 
