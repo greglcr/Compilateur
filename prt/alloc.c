@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdlib.h>
 
 #include "prt.h"
@@ -19,7 +18,7 @@
 void *
 __prt_alloc(prt_int_t n)
 {
-  assert(n > 0); // we forbid 0 and negative values
+  PRT_ASSERT(n > 0); // we forbid 0 and negative values
 #ifdef PRT_USE_GC
   return GC_MALLOC((size_t)n);
 #else
@@ -38,7 +37,7 @@ __prt_alloc(prt_int_t n)
 void *
 __prt_alloc_atomic(prt_int_t n)
 {
-  assert(n > 0); // we forbid 0 and negative values
+  PRT_ASSERT(n > 0); // we forbid 0 and negative values
 #ifdef PRT_USE_GC
   return GC_MALLOC_ATOMIC((size_t)n);
 #else

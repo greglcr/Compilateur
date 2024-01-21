@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -I bdwgc/include -Wall -Wextra -pedantic -O2 -DPRT_USE_GC
 
-objects = alloc.o log.o show.o string.o div.o main.o
+objects = alloc.o log.o show.o string.o div.o assert.o trace.o main.o
 
 all: libprt.a
 

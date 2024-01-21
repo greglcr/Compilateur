@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 #include "prt.h"
@@ -11,7 +10,7 @@
 void
 __prt_log(prt_string_t s)
 {
-  assert(s != NULL);
+  PRT_ASSERT(s != NULL);
   puts(s);
 }
 
