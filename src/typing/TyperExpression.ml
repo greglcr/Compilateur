@@ -216,7 +216,7 @@ let rec type_expr genv lenv e =
 
       (* list_typ contains a list of Ttyp_data *)
 
-      check_exhaust tbranches;
+      check_exhaust genv tbranches;
       mk_node v e.expr_range (Texpr_case (tcond, tbranches))
 
 
@@ -255,7 +255,7 @@ and type_pattern genv lenv pattern =
               (Tpattern_constructor (name, List.map snd tpatterns)) )
       | None -> error name.ident_range ("unknown data constructor " ^ name.spelling))
 
-and check_exhaust tbranches = 
+(*and check_exhaust tbranches = 
   let patterns = List.fold_right (fun x acc -> let (pat, _) = x in pat :: acc) tbranches [] in
   let rec wildcard_in patterns = match patterns with
     | [] -> false
@@ -273,7 +273,7 @@ and check_exhaust tbranches =
     | [] -> false
     | {typ = _; range = _; node = Tpattern_constant(Cbool(false))} :: _ -> true
     | _ :: r_pattern -> check_false r_pattern in
-  match patterns with
+  let rec aux patterns = match patterns with
     | [] -> assert(false)
     | a :: _ -> let typ_param = a.typ in match (typ_param, patterns) with
       | (_, []) -> assert(false)
@@ -282,5 +282,74 @@ and check_exhaust tbranches =
       | (typ_param, _) when typ_param = int_type -> error Location.dummy_range "Non exhaustive pattern" (* If no wildcard or variable, can't be exhaustive *)
       | (typ_param, _) when typ_param = string_type -> error Location.dummy_range "Non exhaustive pattern"
       | (typ, patterns) when typ_param = boolean_type -> if not((check_true patterns) && (check_false patterns)) then error Location.dummy_range "Non exhaustive pattern"
-        (* We first check if all the first parameters are variables *)
+      | 
       | _ -> ()
+in aux patterns*)
+
+and check_exhaust genv tbranches = 
+  let patterns = List.fold_right (fun x acc -> let (pat, _) = x in [pat] :: acc) tbranches [] in
+  let rec get_line_with_wildcard_and_variables patterns = match patterns with
+    | [] -> []
+    | [] :: r_patterns -> get_line_with_wildcard_and_variables r_patterns (* normalement cas impossible *)
+    | ({typ = _; range = _; node = Tpattern_wildcard} :: r_pattern) :: r_patterns -> r_pattern :: (get_line_with_wildcard_and_variables r_patterns) (*Pour récuperer les wildcard*)
+    | ({typ = Ttyp_variable (_); range = _; node = _} :: r_pattern) :: r_patterns -> r_pattern :: (get_line_with_wildcard_and_variables r_patterns)
+    | _ :: r_patterns -> get_line_with_wildcard_and_variables r_patterns
+  and get_line_with_true patterns = match patterns with
+    | [] -> []
+    | [] :: r_patterns -> get_line_with_true r_patterns
+    | ({typ = _; range = _; node = Tpattern_constant(Cbool(true))} :: r_pattern) :: r_patterns -> r_pattern :: (get_line_with_true r_patterns)
+    | _ :: r_patterns -> get_line_with_true r_patterns
+  and get_line_with_false patterns = match patterns with
+    | [] -> []
+    | [] :: r_patterns -> get_line_with_false r_patterns
+    | ({typ = _; range = _; node = Tpattern_constant(Cbool(false))} :: r_pattern) :: r_patterns -> r_pattern :: (get_line_with_false r_patterns)
+    | _ :: r_patterns -> get_line_with_false r_patterns
+  and fill_new_matrices new_matrices data_info = 
+    let rec aux constructors = match constructors with
+      | [] -> ()
+      | constructor :: r_constructors -> Hashtbl.add new_matrices constructor.cons_name.spelling []; aux r_constructors in
+    aux data_info.constructors
+  and construct_new_matrice new_matrices construct_name patterns = 
+    let nb_arguments = (Hashtbl.find genv.cons_decls construct_name).arity in
+    let rec type_patterns types patterns = match (types, patterns) with
+      | ([], []) -> []
+      | (tp :: r_types, pattern :: r_patterns) -> {typ = tp; range = Location.dummy_range; node = pattern} :: (type_patterns r_types r_patterns)
+      | _ -> assert(false) (* Normalement impossible *) in
+    let rec aux patterns = match patterns with
+      | [] -> ()
+      | ({typ = _; range = _; node = Tpattern_constructor(name, arguments)} :: r_pattern) :: r_patterns when name.spelling = construct_name -> 
+        let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args arguments in
+        let new_list = arguments @ r_pattern in
+        Hashtbl.replace new_matrices construct_name (new_list :: Hashtbl.find new_matrices construct_name);
+        aux r_patterns
+      | ({typ = Ttyp_variable (_); range = _; node = _} :: r_pattern) :: r_patterns -> 
+        let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args (List.init nb_arguments (fun _ -> Tpattern_wildcard)) in
+        Hashtbl.replace new_matrices construct_name ((typed_arguments @ r_pattern) :: Hashtbl.find new_matrices construct_name);
+        aux r_patterns
+      | ({typ = _; range = _; node = Tpattern_wildcard} :: r_pattern) :: r_patterns -> 
+        let typed_arguments = type_patterns (Hashtbl.find genv.cons_decls construct_name).args (List.init nb_arguments (fun _ -> Tpattern_wildcard)) in
+        Hashtbl.replace new_matrices construct_name ((typed_arguments @ r_pattern) :: Hashtbl.find new_matrices construct_name);
+        aux r_patterns
+      | _ :: r_patterns -> aux r_patterns in
+    aux patterns in
+  let rec aux patterns = match patterns with
+    | [] -> error Location.dummy_range "Non exhaustive pattern"
+    | [] :: _ -> () (* C'est le cas final de l'execution de notre algorithme, tous les patterns sont vides, donc c'est la première action qui va être
+                                réalisée, donc notre pattern matching est exhaustif*)
+    | (pattern :: _) :: _ -> let typ_first_param = pattern.typ in (match (typ_first_param, patterns) with
+      | (_, []) -> assert(false) (*Cas impossible car on a vérifié au préalable que patterns était forcèement non vide*)
+      | (typ_first_param, patterns) when typ_first_param = int_type -> (*Dans ce cas là, il suffit de récuperer toutes les lignes où on a des variables où des wildcard
+                                                                        parce que si c'est des valeurs entières déjà défini ça ne sert à rien dans l'exhaustivité*)
+                                                                        aux (get_line_with_wildcard_and_variables patterns);
+      | (typ_first_param, patterns) when typ_first_param = string_type -> aux (get_line_with_wildcard_and_variables patterns);
+      | (typ_first_param, patterns) when typ_first_param = boolean_type -> aux ((get_line_with_wildcard_and_variables patterns) @ (get_line_with_true patterns));
+                                                                           aux ((get_line_with_wildcard_and_variables patterns) @ (get_line_with_false patterns));
+      | (Ttyp_data(name_data, _), patterns) ->
+        let data_info = Hashtbl.find genv.data_decls name_data in
+        let new_matrices = Hashtbl.create (List.length data_info.constructors) in
+        fill_new_matrices new_matrices data_info;
+        List.iter (fun construct -> construct_new_matrice new_matrices construct.cons_name.spelling patterns) data_info.constructors;
+        List.iter (fun construct -> aux (Hashtbl.find new_matrices construct.cons_name.spelling)) data_info.constructors;
+        ()
+      | _ -> ()) in
+  aux patterns

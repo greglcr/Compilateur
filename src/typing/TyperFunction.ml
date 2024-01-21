@@ -167,7 +167,7 @@ let type_function genv name decl equations =
 
          However, this does not affect typing but will be problematic later
          for compilation. *)
-      check_exhaust branches;
+      check_exhaust genv branches;
       ( [],
         mk_node func_decl.retty Location.dummy_range
           (Texpr_case
